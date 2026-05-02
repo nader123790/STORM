@@ -7,46 +7,13 @@ import 'dart:ui';
 import 'dart:math' as math;
 import 'dart:js' as js;
 import 'dart:html' as html;
-import 'firebase_options.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'theme.dart';
-
-// ==========================================
-// إرسال رسالة تليجرام عبر السيرفر الوسيط
-// الـ Token مش موجود هنا - موجود في السيرفر بس
-// ==========================================
-// ==========================================
-// Telegram proxy URL from environment variable
-// ==========================================
-const String _telegramProxyUrl = String.fromEnvironment(
-  'TELEGRAM_PROXY_URL',
-  defaultValue: 'https://storm-server-masssage.vercel.app/api/telegram',
-);
-
-Future<void> sendTelegramMessage(String message) async {
-  try {
-    var url = Uri.parse(_telegramProxyUrl);
-    var response = await http.post(
-      url,
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({"message": message}),
-    );
-    debugPrint("Telegram Status: ${response.statusCode}");
-  } catch (e) {
-    debugPrint("Telegram Error: $e");
-  }
-}
+import 'services/api_service.dart';
+import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  } catch (e) {
-    debugPrint("Firebase Init Error: $e");
-  }
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const NeonCyberCafeApp());
 }
 
@@ -400,8 +367,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     }
   }
 
-  void _openUrl(String url) => js.context.callMethod('open', [url]);
-
   void _playSound(String url, {double volume = 1.0}) {
     if (kIsWeb) {
       final normalizedVolume = volume.clamp(0.0, 1.0);
@@ -418,48 +383,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   void _playWaiterBell() => _playSound("https://files.catbox.moe/y77se9.mp3");
 
   void _initStatusListeners() {
-    if (registeredName == null) return;
-
-    FirebaseFirestore.instance
-        .collection('alerts')
-        .where('customer_name', isEqualTo: registeredName)
-        .snapshots()
-        .listen((snapshot) {
-          if (snapshot.docs.isEmpty && _isWaiterAlertActive) {
-            setState(() => _isWaiterAlertActive = false);
-            _playWaiterBell();
-            _showStatusSnackBar(
-              "الويتر جاي لك دلوقتي يا فندم 😊",
-              CafeTheme.accent,
-            );
-          }
-        });
-
-    FirebaseFirestore.instance
-        .collection('orders')
-        .where('customer_name', isEqualTo: registeredName)
-        .snapshots()
-        .listen((snapshot) {
-          for (var change in snapshot.docChanges) {
-            if (change.type == DocumentChangeType.modified) {
-              var data = change.doc.data() as Map<String, dynamic>;
-              String status = data['status'];
-              if (status == 'جاري التجهيز') {
-                _playMicrowaveWorking();
-                _showStatusSnackBar(
-                  "بدأنا نجهز طلبك بكل حب.. ✨",
-                  Colors.orangeAccent,
-                );
-              } else if (status == 'جاهز') {
-                _playMicrowaveDone();
-                _showStatusSnackBar(
-                  "طلبك جاهز يا $registeredName! بالهناء والشفاء ✨",
-                  Colors.greenAccent,
-                );
-              }
-            }
-          }
-        });
+    // Migrated to backend — no direct Firestore access from client
   }
 
   void _showStatusSnackBar(String message, Color color) {
@@ -480,184 +404,105 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     );
   }
 
-  void _showDeveloperContact() {
+  void _showWaiterLogin() {
+    final passwordCtrl = TextEditingController();
+    bool isLoading = false;
+
     showDialog(
       context: context,
-      builder: (context) => BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: AlertDialog(
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
           backgroundColor: const Color(0xFF2E1F10),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16),
             side: const BorderSide(color: CafeTheme.primaryBrown, width: 1),
           ),
           title: const Text(
-            "تواصل مع المطور 👨‍💻",
+            'دخول الويتر 🤵',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: CafeTheme.secondaryBrown,
-              fontWeight: FontWeight.bold,
+            style: TextStyle(color: CafeTheme.secondaryBrown),
+          ),
+          content: TextField(
+            controller: passwordCtrl,
+            obscureText: true,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'أدخل كلمة السر',
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: 0.05),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(15),
+                borderSide: BorderSide.none,
+              ),
             ),
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                "Nader Soltan",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const Text(
-                "AI Engineer",
-                style: TextStyle(
-                  fontSize: 12,
-                  color: CafeTheme.primaryBrown,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 25),
-              _devLink(
-                Icons.chat_bubble_outline,
-                "WhatsApp",
-                Colors.green,
-                "https://wa.me/qr/QS4SMJ54AKJMF1",
-              ),
-              _devLink(
-                Icons.facebook_outlined,
-                "Facebook",
-                Colors.blueAccent,
-                "https://www.facebook.com/share/1ByWx21qNW/",
-              ),
-              _devLink(
-                Icons.camera_alt_outlined,
-                "Instagram",
-                Colors.pinkAccent,
-                "https://www.instagram.com/nadersoltan294?igsh=bDB5eTB3Z2NrMmF6",
-              ),
-              _devLink(
-                Icons.video_collection_outlined,
-                "TikTok",
-                Colors.white,
-                "https://www.tiktok.com/@nadersoltan6?_r=1&_t=ZS-93Uf8vOauIB",
-              ),
-              const Divider(color: Colors.white10, height: 30),
-              const Text(
-                "Call: 01012078944",
-                style: TextStyle(
-                  color: CafeTheme.secondaryBrown,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _devLink(IconData icon, String label, Color color, String url) {
-    return ListTile(
-      leading: Icon(icon, color: color),
-      title: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-      onTap: () => _openUrl(url),
-    );
-  }
-
-  // ==========================================
-  // دخول الويتر - كلمة السر من Firestore
-  // ==========================================
-  void _showWaiterLogin() {
-    final passwordCtrl = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF2E1F10),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: CafeTheme.primaryBrown, width: 1),
-        ),
-        title: const Text(
-          'دخول الويتر 🤵',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: CafeTheme.secondaryBrown),
-        ),
-        content: TextField(
-          controller: passwordCtrl,
-          obscureText: true,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: 'أدخل كلمة السر',
-            filled: true,
-            fillColor: Colors.white.withValues(alpha: 0.05),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
-              borderSide: BorderSide.none,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('إلغاء'),
             ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('إلغاء'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: CafeTheme.primaryBrown,
-            ),
-            onPressed: () async {
-              // ✅ كلمة السر من Firestore مش hardcoded
-              try {
-                final doc = await FirebaseFirestore.instance
-                    .collection('settings')
-                    .doc('waiter')
-                    .get();
-
-                final correctPassword = doc.data()?['password'] ?? '';
-
-                if (passwordCtrl.text == correctPassword) {
-                  if (context.mounted) Navigator.pop(context);
-                  if (context.mounted) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const WaiterTerminal(),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: CafeTheme.primaryBrown,
+              ),
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      setDialogState(() => isLoading = true);
+                      try {
+                        await apiService.loginWaiter(passwordCtrl.text);
+                        if (context.mounted) Navigator.pop(context);
+                        if (context.mounted) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const WaiterTerminal(),
+                            ),
+                          );
+                        }
+                      } on ApiException catch (e) {
+                        setDialogState(() => isLoading = false);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                e.statusCode == 401
+                                    ? 'كلمة السر خاطئة!'
+                                    : 'تعذر التحقق، حاول مرة أخرى',
+                              ),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      } catch (_) {
+                        setDialogState(() => isLoading = false);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('تعذر الاتصال بالخادم'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              child: isLoading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text(
+                      'دخول',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
                       ),
-                    );
-                  }
-                } else {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('كلمة السر خاطئة!'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('تعذر التحقق، حاول مرة أخرى'),
-                      backgroundColor: Colors.red,
                     ),
-                  );
-                }
-              }
-            },
-            child: const Text(
-              'دخول',
-              style: TextStyle(
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
-              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -957,7 +802,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 ),
               ),
               child: GestureDetector(
-                onTap: _showDeveloperContact,
+                onTap: null,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -1545,11 +1390,11 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 
   void _requestBill() async {
     if (registeredName == null) return;
-    await sendTelegramMessage(
-      "🧾 طلب حساب من طاولة $currentTable - العميل: $registeredName",
+    await apiService.sendTelegramMessage(
+      '🧾 طلب حساب من طاولة $currentTable - العميل: $registeredName',
     );
     _showStatusSnackBar(
-      "تم طلب الحساب! سيأتي الويتر قريباً 🧾",
+      'تم طلب الحساب! سيأتي الويتر قريباً 🧾',
       CafeTheme.success,
     );
   }
@@ -2017,36 +1862,38 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   void _sendOrder() async {
     if (basket.isEmpty || registeredName == null) return;
 
-    Map<String, dynamic> orderData = {
-      'customer_name': registeredName,
-      'order_type': 'داخل المكان',
-      'table_number': currentTable,
-      'items_with_qty': basket
-          .map((e) => {'name': e['name'], 'qty': e['quantity']})
-          .toList(),
-      'note': basket.any((e) => e['note'] != "بدون إضافات")
-          ? basket.firstWhere((e) => e['note'] != "بدون إضافات")['note']
-          : "بدون إضافات",
-      'total_price': basket.fold(
-        0.0,
-        (previousValue, item) =>
-            previousValue +
-            ((item['price'] as num) * (item['quantity'] as num)),
-      ),
-      'timestamp': FieldValue.serverTimestamp(),
-      'status': 'قيد الانتظار',
-    };
-
     try {
-      await FirebaseFirestore.instance.collection('orders').add(orderData);
-      await sendTelegramMessage(
-        "🚀 طلب جديد من $registeredName - طاولة $currentTable",
+      final itemsWithQty = basket
+          .map((e) => {'name': e['name'], 'qty': e['quantity']})
+          .toList();
+
+      final double total = basket.fold(
+        0.0,
+        (prev, item) =>
+            prev + ((item['price'] as num) * (item['quantity'] as num)),
       );
+
+      final String note = basket.any((e) => e['note'] != 'بدون إضافات')
+          ? basket.firstWhere((e) => e['note'] != 'بدون إضافات')['note']
+          : 'بدون إضافات';
+
+      await apiService.createOrder(
+        customerName: registeredName!,
+        tableNumber: currentTable ?? '?',
+        itemsWithQty: itemsWithQty,
+        totalPrice: total,
+        note: note,
+      );
+
+      await apiService.sendTelegramMessage(
+        '🚀 طلب جديد من $registeredName - طاولة $currentTable',
+      );
+
       setState(() => basket.clear());
-      _showStatusSnackBar("تم إرسال طلبك! 🚀", Colors.greenAccent);
+      _showStatusSnackBar('تم إرسال طلبك! 🚀', Colors.greenAccent);
     } catch (_) {
       _showStatusSnackBar(
-        "تعذر إرسال الطلب حالياً، حاول مرة أخرى",
+        'تعذر إرسال الطلب حالياً، حاول مرة أخرى',
         Colors.redAccent,
       );
     }
@@ -2056,17 +1903,17 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     if (_isWaiterAlertActive || registeredName == null) return;
     setState(() => _isWaiterAlertActive = true);
     try {
-      await FirebaseFirestore.instance.collection('alerts').add({
-        'customer_name': registeredName,
-        'table_number': currentTable,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-      await sendTelegramMessage(
-        "🔔 نداء ويتر من طاولة $currentTable - العميل: $registeredName",
+      await apiService.callWaiter(
+        customerName: registeredName!,
+        tableNumber: currentTable ?? '?',
+      );
+
+      await apiService.sendTelegramMessage(
+        '🔔 نداء ويتر من طاولة $currentTable - العميل: $registeredName',
       );
     } catch (_) {
       setState(() => _isWaiterAlertActive = false);
-      _showStatusSnackBar("تعذر إرسال نداء الويتر حالياً", Colors.redAccent);
+      _showStatusSnackBar('تعذر إرسال نداء الويتر حالياً', Colors.redAccent);
     }
   }
 
@@ -3084,7 +2931,6 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
   @override
   void initState() {
     super.initState();
-    _initWaiterAlerts();
   }
 
   void _playSound(String url) {
@@ -3093,41 +2939,6 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
         "(function() { var audio = new Audio('$url'); audio.play(); })();",
       ]);
     }
-  }
-
-  void _playBell() => _playSound(
-    "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3",
-  );
-  void _playWorkingSound() =>
-      _playSound("https://www.soundjay.com/misc/sounds/microwave-hum-1.mp3");
-
-  void _initWaiterAlerts() {
-    FirebaseFirestore.instance.collection('orders').snapshots().listen((
-      snapshot,
-    ) {
-      for (var change in snapshot.docChanges) {
-        if (change.type == DocumentChangeType.modified) {
-          var data = change.doc.data() as Map<String, dynamic>;
-          String status = data['status'] ?? "";
-          String customer = data['customer_name'] ?? "عميل";
-          String table = data['table_number']?.toString() ?? "?";
-
-          if (status == 'جاهز') {
-            _playBell();
-            _showSnack(
-              "✅ طلب $customer (طاولة $table) جاهز الآن!",
-              Colors.green,
-            );
-          } else if (status == 'جاري التجهيز') {
-            _playWorkingSound();
-            _showSnack(
-              "☕ بدأ تجهيز طلب $customer (طاولة $table)",
-              Colors.orangeAccent,
-            );
-          }
-        }
-      }
-    });
   }
 
   void _showWaiterAddDialog(Map<String, dynamic> item) {
@@ -3284,43 +3095,55 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
   }
 
   void _sendToBarista() async {
-    if (waiterBasket.isEmpty) return;
+    final tableName = tableCtrl.text.trim();
+    final customerName = nameCtrl.text.trim();
 
-    String tableName = tableCtrl.text.trim();
-    String customerName = nameCtrl.text.trim();
-
+    if (waiterBasket.isEmpty) {
+      _showSnack('السلة فارغة!', Colors.orangeAccent);
+      return;
+    }
     if (tableName.isEmpty || customerName.isEmpty) {
-      _showSnack("يرجى إدخال رقم الطاولة واسم العميل", Colors.redAccent);
+      _showSnack('يرجى إدخال رقم الطاولة واسم العميل', Colors.orangeAccent);
       return;
     }
 
-    Map<String, dynamic> orderData = {
-      'customer_name': customerName,
-      'order_type': 'ويتر',
-      'table_number': tableName,
-      'items_with_qty': waiterBasket
-          .map((e) => {'name': e['name'], 'qty': e['qty']})
-          .toList(),
-      'note': waiterBasket.any((e) => e['note'] != "بدون ملاحظات")
-          ? waiterBasket.firstWhere((e) => e['note'] != "بدون ملاحظات")['note']
-          : "بدون ملاحظات",
-      'total_price': waiterBasket.fold(
-        0.0,
-        (prev, item) => prev + ((item['price'] as num) * (item['qty'] as num)),
-      ),
-      'timestamp': FieldValue.serverTimestamp(),
-      'status': 'قيد الانتظار',
-    };
+    final itemsWithQty = waiterBasket
+        .map((e) => {'name': e['name'], 'qty': e['qty']})
+        .toList();
+
+    final double total = waiterBasket.fold(
+      0.0,
+      (prev, item) => prev + ((item['price'] as num) * (item['qty'] as num)),
+    );
+
+    final String note = waiterBasket.any((e) => e['note'] != 'بدون ملاحظات')
+        ? waiterBasket.firstWhere((e) => e['note'] != 'بدون ملاحظات')['note']
+        : 'بدون ملاحظات';
 
     try {
-      await FirebaseFirestore.instance.collection('orders').add(orderData);
-      await sendTelegramMessage(
-        "🤵 طلب ويتر: $customerName - طاولة $tableName",
+      await apiService.createWaiterOrder(
+        customerName: customerName,
+        tableNumber: tableName,
+        itemsWithQty: itemsWithQty,
+        totalPrice: total,
+        note: note,
       );
+
+      await apiService.sendTelegramMessage(
+        '🤵 طلب ويتر: $customerName - طاولة $tableName',
+      );
+
       setState(() => waiterBasket.clear());
-      _showSnack("تم إرسال الطلب للباريستا! ✅", Colors.greenAccent);
-    } catch (_) {
-      _showSnack("تعذر إرسال الطلب الآن، حاول مرة أخرى", Colors.redAccent);
+      _showSnack('تم إرسال الطلب للباريستا! ✅', Colors.greenAccent);
+    } catch (e) {
+      if (e is ApiException && e.statusCode == 401) {
+        _showSnack(
+          'انتهت صلاحية الجلسة — يرجى تسجيل الدخول مجدداً',
+          Colors.red,
+        );
+      } else {
+        _showSnack('تعذر إرسال الطلب الآن، حاول مرة أخرى', Colors.redAccent);
+      }
     }
   }
 
@@ -3761,10 +3584,13 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
     return Expanded(
       child: GestureDetector(
         onTap: () async {
-          await FirebaseFirestore.instance
-              .collection('orders')
-              .doc(docId)
-              .update({'status': label});
+          try {
+            await apiService.updateOrder(docId, label);
+          } catch (e) {
+            if (mounted) {
+              _showSnack('تعذر تحديث الحالة', Colors.redAccent);
+            }
+          }
         },
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 8),
