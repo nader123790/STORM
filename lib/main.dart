@@ -906,9 +906,10 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                   ),
                 ),
                 const SizedBox(height: 6),
-                AnimatedBuilder(
-                  animation: _glowController,
-                  builder: (context, _) => GestureDetector(
+                RepaintBoundary(
+                  child: AnimatedBuilder(
+                    animation: _glowController,
+                    builder: (context, _) => GestureDetector(
                     onTap: _callWaiter,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -946,6 +947,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                       ),
                     ),
                   ),
+                ),
                 ),
               ],
             ),
@@ -1089,41 +1091,36 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   Widget _buildAllCatsButton(List<QueryDocumentSnapshot> cats) {
     return GestureDetector(
       onTap: () => _showCategoriesSheet(cats),
-      child: AnimatedBuilder(
-        animation: _glowController,
-        builder: (context, _) => Container(
-          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [CafeTheme.primaryBrown, Color(0xFF7A4D2A)],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [CafeTheme.primaryBrown, Color(0xFF7A4D2A)],
+          ),
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: [
+            BoxShadow(
+              color: CafeTheme.primaryBrown.withValues(alpha: 0.5),
+              blurRadius: 20,
+              spreadRadius: 2,
             ),
-            borderRadius: BorderRadius.circular(30),
-            boxShadow: [
-              BoxShadow(
-                color: CafeTheme.primaryBrown.withValues(
-                  alpha: 0.4 + 0.3 * _glowController.value,
-                ),
-                blurRadius: 20,
-                spreadRadius: 2,
+          ],
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.grid_view_rounded, color: Colors.black, size: 18),
+            SizedBox(width: 8),
+            Text(
+              "كل الأقسام",
+              style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.w900,
+                fontSize: 15,
+                letterSpacing: 1,
               ),
-            ],
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.grid_view_rounded, color: Colors.black, size: 18),
-              SizedBox(width: 8),
-              Text(
-                "كل الأقسام",
-                style: TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 15,
-                  letterSpacing: 1,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1286,9 +1283,10 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             ),
             const SizedBox(height: 10),
           ],
-          AnimatedBuilder(
-            animation: _fabPulseController,
-            builder: (context, _) => GestureDetector(
+          RepaintBoundary(
+            child: AnimatedBuilder(
+              animation: _fabPulseController,
+              builder: (context, _) => GestureDetector(
               onTap: () => setState(() => _showQuickMenu = !_showQuickMenu),
               child: Container(
                 width: 54,
@@ -1330,6 +1328,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
               ),
             ),
           ),
+          ),
         ],
       ),
     );
@@ -1362,24 +1361,21 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             child: Icon(icon, color: color, size: 20),
           ),
           const SizedBox(width: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                color: Colors.white.withValues(alpha: 0.08),
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                ),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 5,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.65),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
               ),
             ),
           ),
@@ -1410,33 +1406,27 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       bottom: 0,
       left: 0,
       right: 0,
-      child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
-          child: Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFF0D0804).withValues(alpha: 0.95),
-              border: const Border(
-                top: BorderSide(color: CafeTheme.primaryBrown, width: 1.5),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: CafeTheme.primaryBrown.withValues(alpha: 0.3),
-                  blurRadius: 20,
-                  offset: const Offset(0, -5),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildActiveOrdersTracker(),
-                _buildBasketRow(),
-                _buildCheckoutBar(),
-              ],
-            ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF0D0804).withValues(alpha: 0.97),
+          border: const Border(
+            top: BorderSide(color: CafeTheme.primaryBrown, width: 1.5),
           ),
+          boxShadow: [
+            BoxShadow(
+              color: CafeTheme.primaryBrown.withValues(alpha: 0.3),
+              blurRadius: 20,
+              offset: const Offset(0, -5),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildActiveOrdersTracker(),
+            _buildBasketRow(),
+            _buildCheckoutBar(),
+          ],
         ),
       ),
     );
@@ -1715,9 +1705,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            return BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-              child: AlertDialog(
+            return AlertDialog(
                 backgroundColor: const Color(0xFF2E1F10),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
@@ -1857,7 +1845,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                     ),
                   ),
                 ],
-              ),
             );
           },
         );
@@ -2060,7 +2047,7 @@ class _CinematicCategoryCarouselState extends State<CinematicCategoryCarousel> {
       initialPage: _selectedIndex,
     );
     _pageController!.addListener(() {
-      setState(() => _currentPage = _pageController!.page ?? 0);
+      if (mounted) setState(() => _currentPage = _pageController!.page ?? 0);
     });
     oldCtrl?.dispose();
   }
@@ -2162,7 +2149,8 @@ class _CinematicCategoryCarouselState extends State<CinematicCategoryCarousel> {
               ),
             ),
           ),
-          PageView.builder(
+          RepaintBoundary(
+            child: PageView.builder(
             controller: _pageController!,
             itemCount: cats.length,
             physics: const BouncingScrollPhysics(
@@ -2198,14 +2186,9 @@ class _CinematicCategoryCarouselState extends State<CinematicCategoryCarousel> {
                   ..rotateY(-yRotation),
                 child: Transform.scale(
                   scale: scale,
-                  child: ImageFiltered(
-                    imageFilter: ImageFilter.blur(
-                      sigmaX: isSelected ? 0 : blurSigma,
-                      sigmaY: isSelected ? 0 : blurSigma,
-                    ),
-                    child: Opacity(
-                      opacity: opacity,
-                      child: GestureDetector(
+                  child: Opacity(
+                    opacity: opacity,
+                    child: GestureDetector(
                         onTap: () => widget.onSelect(name),
                         child: Container(
                           margin: const EdgeInsets.symmetric(
@@ -2310,9 +2293,9 @@ class _CinematicCategoryCarouselState extends State<CinematicCategoryCarousel> {
                       ),
                     ),
                   ),
-                ),
               );
             },
+          ),
           ),
         ],
       ),
@@ -2344,22 +2327,27 @@ class UFOBeamProductSection extends StatelessWidget {
     if (items.isEmpty) return const SizedBox();
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Column(
-        children: List.generate(items.length, (i) {
+      child: ListView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: items.length,
+        itemBuilder: (context, i) {
           final item = items[i];
           final String name = item['name'] ?? '';
           final int basketIdx = basket.indexWhere((e) => e['name'] == name);
           final bool inBasket = basketIdx != -1;
-          return _NeonProductCard(
-            key: ValueKey('${categoryName}_$name'),
-            item: item,
-            inBasket: inBasket,
-            qty: inBasket ? (basket[basketIdx]['quantity'] as int) : 0,
-            onAdd: () => onAddItem(item),
-            onMinus: inBasket ? () => onQuantityChange(basketIdx, false) : null,
-            onPlus: inBasket ? () => onQuantityChange(basketIdx, true) : null,
+          return RepaintBoundary(
+            child: _NeonProductCard(
+              key: ValueKey('${categoryName}_$name'),
+              item: item,
+              inBasket: inBasket,
+              qty: inBasket ? (basket[basketIdx]['quantity'] as int) : 0,
+              onAdd: () => onAddItem(item),
+              onMinus: inBasket ? () => onQuantityChange(basketIdx, false) : null,
+              onPlus: inBasket ? () => onQuantityChange(basketIdx, true) : null,
+            ),
           );
-        }),
+        },
       ),
     );
   }
