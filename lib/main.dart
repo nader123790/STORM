@@ -1391,7 +1391,13 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   void _requestBill() async {
     if (registeredName == null) return;
     await apiService.sendTelegramMessage(
-      '🧾 طلب حساب من طاولة $currentTable - العميل: $registeredName',
+      '━━━━━━━━━━━━━━━━━━\n'
+      '🧾 طلب حساب — Storm Café\n'
+      '━━━━━━━━━━━━━━━━━━\n'
+      '👤 العميل : $registeredName\n'
+      '🪑 الطاولة : $currentTable\n'
+      '━━━━━━━━━━━━━━━━━━\n'
+      '💳 العميل جاهز للدفع!',
     );
     _showStatusSnackBar(
       'تم طلب الحساب! سيأتي الويتر قريباً 🧾',
@@ -1885,8 +1891,22 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         note: note,
       );
 
+      final itemLines = basket
+          .map((e) => '  • ${e['name']} × ${e['quantity']}')
+          .join('\n');
+
       await apiService.sendTelegramMessage(
-        '🚀 طلب جديد من $registeredName - طاولة $currentTable',
+        '━━━━━━━━━━━━━━━━━━\n'
+        '☕ طلب جديد — Storm Café\n'
+        '━━━━━━━━━━━━━━━━━━\n'
+        '👤 العميل : $registeredName\n'
+        '🪑 الطاولة : $currentTable\n'
+        '━━━━━━━━━━━━━━━━━━\n'
+        '🛒 الطلبات :\n$itemLines\n'
+        '━━━━━━━━━━━━━━━━━━\n'
+        '📝 ملاحظة : $note\n'
+        '💰 الإجمالي : ${total.toStringAsFixed(2)} ج.م\n'
+        '━━━━━━━━━━━━━━━━━━',
       );
 
       setState(() => basket.clear());
@@ -1909,7 +1929,13 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       );
 
       await apiService.sendTelegramMessage(
-        '🔔 نداء ويتر من طاولة $currentTable - العميل: $registeredName',
+        '━━━━━━━━━━━━━━━━━━\n'
+        '🔔 نداء ويتر — Storm Café\n'
+        '━━━━━━━━━━━━━━━━━━\n'
+        '👤 العميل : $registeredName\n'
+        '🪑 الطاولة : $currentTable\n'
+        '━━━━━━━━━━━━━━━━━━\n'
+        '⚡ العميل يطلب مساعدة الويتر الآن!',
       );
     } catch (_) {
       setState(() => _isWaiterAlertActive = false);
@@ -3129,8 +3155,22 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
         note: note,
       );
 
+      final waiterItemLines = waiterBasket
+          .map((e) => '  • ${e['name']} × ${e['qty']}')
+          .join('\n');
+
       await apiService.sendTelegramMessage(
-        '🤵 طلب ويتر: $customerName - طاولة $tableName',
+        '━━━━━━━━━━━━━━━━━━\n'
+        '🤵 طلب ويتر — Storm Café\n'
+        '━━━━━━━━━━━━━━━━━━\n'
+        '👤 العميل : $customerName\n'
+        '🪑 الطاولة : $tableName\n'
+        '━━━━━━━━━━━━━━━━━━\n'
+        '🛒 الطلبات :\n$waiterItemLines\n'
+        '━━━━━━━━━━━━━━━━━━\n'
+        '📝 ملاحظة : $note\n'
+        '💰 الإجمالي : ${total.toStringAsFixed(2)} ج.م\n'
+        '━━━━━━━━━━━━━━━━━━',
       );
 
       setState(() => waiterBasket.clear());
