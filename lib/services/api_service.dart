@@ -19,7 +19,7 @@ import 'package:http/http.dart' as http;
 ///
 /// NO defaultValue is provided — if the URL is missing the app will fail
 /// loudly at build/runtime, which is intentional (fail-safe).
-const String _baseUrl = String.fromEnvironment('API_BASE_URL');
+const String _baseUrl = 'https://storm-server-masssage.vercel.app';
 
 /// Thrown when the backend returns a non-2xx status.
 class ApiException implements Exception {
@@ -70,14 +70,32 @@ class ApiService {
 
   /// Parses a response; throws [ApiException] on non-2xx.
   Map<String, dynamic> _parse(http.Response response) {
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      final message = (body['error'] as String?) ?? 'Unknown error';
-      throw ApiException(response.statusCode, message);
-    }
-    return body;
-  }
+    try {
+      final decoded = jsonDecode(response.body);
 
+      if (decoded is! Map<String, dynamic>) {
+        throw ApiException(
+          response.statusCode,
+          'Invalid JSON format from server',
+        );
+      }
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final message =
+            (decoded['error'] as String?) ??
+            (decoded['message'] as String?) ??
+            'Unknown error';
+        throw ApiException(response.statusCode, message);
+      }
+
+      return decoded;
+    } catch (e) {
+      throw ApiException(
+        response.statusCode,
+        'Server returned invalid response: ${response.body}',
+      );
+    }
+  }
   // ── Auth ──────────────────────────────────────────────────────────────────
 
   /// Logs in a waiter by sending the password to the backend for validation.
