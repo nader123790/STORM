@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "620720326477",
+    "project_id": "storm-cafe-15279",
+    "storage_bucket": "storm-cafe-15279.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:620720326477:android:fc7b91a0d1e1e82b10d904",
+        "android_client_info": {
+          "package_name": "com.example.storm_cafe_wepapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBOWcKNQkCtiaZKtSg1-I2qyP9XJgZV4DE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
