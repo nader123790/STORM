@@ -2,38 +2,37 @@ import 'package:flutter/material.dart';
 
 /// ==========================================
 /// Storm Café — Premium Dark Café Theme
-/// Professional Material 3 Theme
+/// Material 3 | Optimized
 /// ==========================================
 class CafeTheme {
   CafeTheme._();
 
-  // ── Core palette (extracted from logo) ──
-  static const Color darkBg = Color(0xFF000000);
-  static const Color surface = Color(0xFF2E1F10);
-  static const Color primaryBrown = Color(0xFF5F3814);
-  static const Color secondaryBrown = Color(0xFF987B5C);
-  static const Color accent = Color(0xFFC49A6D);
-  static const Color mutedText = Color(0xFF65533E);
-  static const Color textMain = Color(0xFFF5E6D3);
-  static const Color border = Color(0x40C49A6D);
+  // ── Core palette ──
+  static const Color darkBg          = Color(0xFF000000);
+  static const Color surface         = Color(0xFF2E1F10);
+  static const Color primaryBrown    = Color(0xFF5F3814);
+  static const Color secondaryBrown  = Color(0xFF987B5C);
+  static const Color accent          = Color(0xFFC49A6D);
+  static const Color mutedText       = Color(0xFF65533E);
+  static const Color textMain        = Color(0xFFF5E6D3);
+  static const Color border          = Color(0x40C49A6D);
 
   // ── Extended palette ──
-  static const Color deepBrown = Color(0xFF1A0F05);
-  static const Color cardBg = Color(0xFF231507);
-  static const Color inputBg = Color(0xFF1C1208);
+  static const Color deepBrown  = Color(0xFF1A0F05);
+  static const Color cardBg     = Color(0xFF231507);
+  static const Color inputBg    = Color(0xFF1C1208);
   static const Color hoverBrown = Color(0xFF7A4D2A);
   static const Color accentGold = Color(0xFFD4A96A);
 
   static const Color success = Color(0xFF4CAF50);
   static const Color warning = Color(0xFFFF9800);
-  static const Color error = Color(0xFFE53935);
+  static const Color error   = Color(0xFFE53935);
 
-  // ── Modern helper colors ──
-  static const Color outline = Color(0x55C49A6D);
+  static const Color outline  = Color(0x55C49A6D);
   static const Color disabled = Color(0xFF3A2A1B);
-  static const Color shadow = Color(0xCC000000);
+  static const Color shadow   = Color(0xCC000000);
 
-  // ── Radius system ──
+  // ── Radius ──
   static const double radiusSm = 12;
   static const double radiusMd = 16;
   static const double radiusLg = 22;
@@ -63,86 +62,30 @@ class CafeTheme {
     colors: [Color(0xFF1A2A10), Color(0xFF0D1A05), Color(0xFF060804)],
   );
 
-  // ── Text theme (Premium Cairo Styling) ──
+  // ── Text Theme ──
   static const TextTheme textTheme = TextTheme(
-    headlineLarge: TextStyle(
-      fontSize: 30,
-      fontWeight: FontWeight.w800,
-      color: textMain,
-      letterSpacing: 0.2,
-    ),
-    headlineMedium: TextStyle(
-      fontSize: 24,
-      fontWeight: FontWeight.w800,
-      color: textMain,
-    ),
-    headlineSmall: TextStyle(
-      fontSize: 20,
-      fontWeight: FontWeight.w700,
-      color: textMain,
-    ),
-    titleLarge: TextStyle(
-      fontSize: 18,
-      fontWeight: FontWeight.w700,
-      color: textMain,
-    ),
-    titleMedium: TextStyle(
-      fontSize: 16,
-      fontWeight: FontWeight.w700,
-      color: textMain,
-    ),
-    titleSmall: TextStyle(
-      fontSize: 14,
-      fontWeight: FontWeight.w700,
-      color: textMain,
-    ),
-    bodyLarge: TextStyle(
-      fontSize: 15,
-      fontWeight: FontWeight.w500,
-      color: textMain,
-      height: 1.6,
-    ),
-    bodyMedium: TextStyle(
-      fontSize: 14,
-      fontWeight: FontWeight.w500,
-      color: textMain,
-      height: 1.6,
-    ),
-    bodySmall: TextStyle(
-      fontSize: 12,
-      fontWeight: FontWeight.w500,
-      color: mutedText,
-      height: 1.5,
-    ),
-    labelLarge: TextStyle(
-      fontSize: 14,
-      fontWeight: FontWeight.w700,
-      color: textMain,
-    ),
-    labelMedium: TextStyle(
-      fontSize: 12,
-      fontWeight: FontWeight.w700,
-      color: textMain,
-    ),
-    labelSmall: TextStyle(
-      fontSize: 11,
-      fontWeight: FontWeight.w600,
-      color: mutedText,
-    ),
+    headlineLarge:  TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: textMain, letterSpacing: 0.2),
+    headlineMedium: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: textMain),
+    headlineSmall:  TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: textMain),
+    titleLarge:     TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: textMain),
+    titleMedium:    TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: textMain),
+    titleSmall:     TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: textMain),
+    bodyLarge:      TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: textMain, height: 1.6),
+    bodyMedium:     TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: textMain, height: 1.6),
+    bodySmall:      TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: mutedText, height: 1.5),
+    labelLarge:     TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: textMain),
+    labelMedium:    TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: textMain),
+    labelSmall:     TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: mutedText),
   );
 
-  // ── ThemeData ──
   static ThemeData get themeData => ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
     scaffoldBackgroundColor: darkBg,
     fontFamily: 'Cairo',
+    splashColor: Color(0x1FC49A6D),
+    highlightColor: Color(0x0FC49A6D),
 
-    // smooth ripple
-    splashColor: accent.withValues(alpha: 0.12),
-    highlightColor: accent.withValues(alpha: 0.06),
-
-    // main scheme
     colorScheme: ColorScheme.fromSeed(
       seedColor: primaryBrown,
       brightness: Brightness.dark,
@@ -156,13 +99,9 @@ class CafeTheme {
       onError: Colors.white,
     ),
 
-    // typography
     textTheme: textTheme,
-
-    // icons
     iconTheme: const IconThemeData(color: accent, size: 22),
 
-    // AppBar
     appBarTheme: AppBarTheme(
       backgroundColor: surface,
       foregroundColor: textMain,
@@ -172,35 +111,28 @@ class CafeTheme {
       iconTheme: const IconThemeData(color: accent),
     ),
 
-    // Cards
     cardTheme: CardThemeData(
-      color: cardBg.withValues(alpha: 0.92),
+      color: Color(0xEB231507),
       elevation: 0,
       shadowColor: shadow,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(radiusLg),
-        side: BorderSide(color: outline.withValues(alpha: 0.25)),
+        side: BorderSide(color: Color(0x40C49A6D)),
       ),
     ),
 
-    // Divider
-    dividerTheme: DividerThemeData(
-      color: outline.withValues(alpha: 0.25),
-      thickness: 1,
-    ),
+    dividerTheme: const DividerThemeData(color: Color(0x40C49A6D), thickness: 1),
 
-    // Bottom navigation
     bottomNavigationBarTheme: BottomNavigationBarThemeData(
       backgroundColor: surface,
       selectedItemColor: accent,
-      unselectedItemColor: mutedText.withValues(alpha: 0.85),
+      unselectedItemColor: Color(0xD965533E),
       type: BottomNavigationBarType.fixed,
       elevation: 0,
       selectedLabelStyle: textTheme.labelSmall,
       unselectedLabelStyle: textTheme.labelSmall,
     ),
 
-    // Buttons
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: primaryBrown,
@@ -208,9 +140,7 @@ class CafeTheme {
         elevation: 0,
         shadowColor: Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(radiusMd),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radiusMd)),
         textStyle: textTheme.labelLarge,
       ),
     ),
@@ -218,11 +148,9 @@ class CafeTheme {
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: accent,
-        side: BorderSide(color: outline.withValues(alpha: 0.55)),
+        side: const BorderSide(color: Color(0x8CC49A6D)),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(radiusMd),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radiusMd)),
         textStyle: textTheme.labelLarge,
       ),
     ),
@@ -234,90 +162,82 @@ class CafeTheme {
       ),
     ),
 
-    // Inputs
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: inputBg.withValues(alpha: 0.95),
-      hintStyle: TextStyle(color: mutedText.withValues(alpha: 0.7)),
+      fillColor: Color(0xF21C1208),
+      hintStyle: const TextStyle(color: Color(0xB265533E)),
       labelStyle: const TextStyle(color: accent),
-      prefixIconColor: accent.withValues(alpha: 0.9),
-      suffixIconColor: mutedText.withValues(alpha: 0.9),
+      prefixIconColor: Color(0xE6C49A6D),
+      suffixIconColor: Color(0xE665533E),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radiusMd),
-        borderSide: BorderSide(color: outline.withValues(alpha: 0.25)),
+        borderSide: const BorderSide(color: Color(0x40C49A6D)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radiusMd),
-        borderSide: BorderSide(color: outline.withValues(alpha: 0.25)),
+        borderSide: const BorderSide(color: Color(0x40C49A6D)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radiusMd),
-        borderSide: BorderSide(color: accent.withValues(alpha: 0.8)),
+        borderSide: const BorderSide(color: Color(0xCCC49A6D)),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radiusMd),
-        borderSide: BorderSide(color: error.withValues(alpha: 0.7)),
+        borderSide: const BorderSide(color: Color(0xB2E53935)),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radiusMd),
-        borderSide: BorderSide(color: error),
+        borderSide: const BorderSide(color: error),
       ),
     ),
 
-    // Chips
     chipTheme: ChipThemeData(
-      backgroundColor: cardBg.withValues(alpha: 0.8),
-      selectedColor: accent.withValues(alpha: 0.25),
+      backgroundColor: Color(0xCC231507),
+      selectedColor: Color(0x40C49A6D),
       disabledColor: disabled,
       labelStyle: textTheme.labelMedium,
       secondaryLabelStyle: textTheme.labelMedium,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(radiusMd),
-        side: BorderSide(color: outline.withValues(alpha: 0.25)),
+        side: const BorderSide(color: Color(0x40C49A6D)),
       ),
     ),
 
-    // Dialog
     dialogTheme: DialogThemeData(
-      backgroundColor: cardBg.withValues(alpha: 0.98),
+      backgroundColor: Color(0xFA231507),
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(radiusLg),
-        side: BorderSide(color: outline.withValues(alpha: 0.25)),
+        side: const BorderSide(color: Color(0x40C49A6D)),
       ),
       titleTextStyle: textTheme.titleLarge,
       contentTextStyle: textTheme.bodyMedium,
     ),
-    // SnackBar
+
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      backgroundColor: cardBg.withValues(alpha: 0.95),
+      backgroundColor: Color(0xF2231507),
       contentTextStyle: textTheme.bodyMedium,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(radiusMd),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radiusMd)),
     ),
 
-    // Tooltip
     tooltipTheme: TooltipThemeData(
       decoration: BoxDecoration(
-        color: cardBg.withValues(alpha: 0.95),
+        color: Color(0xF2231507),
         borderRadius: BorderRadius.circular(radiusSm),
-        border: Border.all(color: outline.withValues(alpha: 0.2)),
+        border: Border.all(color: Color(0x33C49A6D)),
       ),
       textStyle: textTheme.bodySmall,
     ),
 
-    // Popup menus
     popupMenuTheme: PopupMenuThemeData(
-      color: cardBg.withValues(alpha: 0.98),
+      color: Color(0xFA231507),
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(radiusMd),
-        side: BorderSide(color: outline.withValues(alpha: 0.25)),
+        side: const BorderSide(color: Color(0x40C49A6D)),
       ),
       textStyle: textTheme.bodyMedium,
     ),
