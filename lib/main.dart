@@ -20,12 +20,6 @@ Future<void> main() async {
 const String localBackgroundImage = 'assets/images/storm_bg.jpg';
 const String localLogoImage = 'assets/images/storm_logo.png';
 
-// ── Pre-computed static colors to avoid withOpacity allocations in build ──
-const Color _kDeepBrownOverlay93 = Color(0xEDAE6A30); // deepBrown @ 0.93 approx
-// These are used frequently — defined once as constants.
-const Color _kSurface85 = Color(0xD92E1F10);
-const Color _kBlack50 = Color(0x80000000);
-
 class NeonCyberCafeApp extends StatelessWidget {
   const NeonCyberCafeApp({super.key});
 
@@ -53,7 +47,7 @@ Widget buildstormLogo({double size = 60, Color? color}) {
 }
 
 // ==========================================
-// مكون الخلفية - مفصول ومحاط بـ RepaintBoundary
+// مكون الخلفية - مفصول لتحسين الأداء (Laveora Style)
 // ==========================================
 class _MenuBackground extends StatelessWidget {
   const _MenuBackground();
@@ -71,21 +65,20 @@ class _MenuBackground extends StatelessWidget {
               height: double.infinity,
               cacheWidth: 1920,
               errorBuilder: (context, error, stackTrace) =>
-                  const ColoredBox(color: CafeTheme.deepBrown),
+                  Container(color: CafeTheme.deepBrown),
             ),
-            // FIX: Use const color instead of withValues() allocation every build
-            const ColoredBox(color: Color(0xEE1A0F05)),
+            Container(color: CafeTheme.deepBrown.withValues(alpha: 0.93)),
             Container(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: RadialGradient(
-                  center: Alignment(-0.2, -0.1),
+                  center: const Alignment(-0.2, -0.1),
                   radius: 1.2,
                   colors: [
-                    Color(0x1A5F3814), // primaryBrown @ 0.10
-                    Color(0x0F987B5C), // secondaryBrown @ 0.06
+                    CafeTheme.primaryBrown.withValues(alpha: 0.10),
+                    CafeTheme.secondaryBrown.withValues(alpha: 0.06),
                     Colors.transparent,
                   ],
-                  stops: [0.0, 0.5, 1.0],
+                  stops: const [0.0, 0.5, 1.0],
                 ),
               ),
             ),
@@ -109,11 +102,7 @@ class MenuPage extends StatefulWidget {
 class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   String? currentCat;
   final TextEditingController _catSearchCtrl = TextEditingController();
-
-  // FIX: Separate notifier for search so only product list rebuilds on search change
-  final ValueNotifier<String> _searchNotifier = ValueNotifier('');
   final TextEditingController _globalSearchCtrl = TextEditingController();
-
   List<Map<String, dynamic>> basket = [];
   String? registeredName;
   String? currentTable;
@@ -121,10 +110,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   bool _isEntryComplete = false;
   bool _hasSavedName = false;
   bool _isWaiterAlertActive = false;
-
-  // FIX: Use ValueNotifier instead of setState for quick menu toggle
-  // so only the FAB widget rebuilds, not the whole page
-  final ValueNotifier<bool> _showQuickMenuNotifier = ValueNotifier(false);
+  bool _showQuickMenu = false;
 
   late AnimationController _glowController;
   late AnimationController _fabPulseController;
@@ -146,11 +132,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 2200),
     )..repeat(reverse: true);
 
-    // FIX: Sync search controller to notifier so product list reacts in isolation
-    _globalSearchCtrl.addListener(() {
-      _searchNotifier.value = _globalSearchCtrl.text;
-    });
-
     _checkSavedData();
   }
 
@@ -160,8 +141,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     _fabPulseController.dispose();
     _catSearchCtrl.dispose();
     _globalSearchCtrl.dispose();
-    _searchNotifier.dispose();
-    _showQuickMenuNotifier.dispose();
     _noteController.dispose();
     _nameEntryController.dispose();
     _tableEntryController.dispose();
@@ -176,9 +155,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) {
-        final double screenWidth = MediaQuery.of(context).size.width;
-        final int crossAxisCount = screenWidth < 600 ? 2 : 4;
-        final double childAspectRatio = screenWidth < 400
+        double screenWidth = MediaQuery.of(context).size.width;
+        int crossAxisCount = screenWidth < 600 ? 2 : 4;
+        double childAspectRatio = screenWidth < 400
             ? 2.0
             : screenWidth < 600
             ? 2.3
@@ -187,10 +166,10 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         return StatefulBuilder(
           builder: (context, setSheetState) {
             List<QueryDocumentSnapshot> filteredCats = cats;
-            final String q = _catSearchCtrl.text.trim();
+            String q = _catSearchCtrl.text.trim();
             if (q.isNotEmpty) {
               filteredCats = cats.where((doc) {
-                final String name = (doc['name'] ?? '').toString();
+                String name = (doc['name'] ?? "").toString();
                 return name.contains(q);
               }).toList();
             }
@@ -203,13 +182,12 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                 child: Container(
                   height: MediaQuery.of(context).size.height * 0.75,
-                  decoration: const BoxDecoration(
-                    // FIX: const color instead of withValues() allocation
-                    color: Color(0xD92E1F10),
-                    borderRadius: BorderRadius.vertical(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2E1F10).withValues(alpha: 0.85),
+                    borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(32),
                     ),
-                    border: Border(
+                    border: const Border(
                       top: BorderSide(
                         color: CafeTheme.primaryBrown,
                         width: 1.5,
@@ -223,6 +201,13 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                         width: 0.5,
                       ),
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: CafeTheme.primaryBrown.withValues(alpha: 0.4),
+                        blurRadius: 40,
+                        spreadRadius: 5,
+                      ),
+                    ],
                   ),
                   child: Padding(
                     padding: EdgeInsets.only(
@@ -267,10 +252,12 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                         const SizedBox(height: 20),
                         Container(
                           decoration: BoxDecoration(
-                            color: const Color(0x14FFFFFF),
+                            color: Colors.white.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: const Color(0x66987B5C),
+                              color: CafeTheme.secondaryBrown.withValues(
+                                alpha: 0.4,
+                              ),
                               width: 1,
                             ),
                           ),
@@ -304,12 +291,16 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                                   mainAxisSpacing: 16,
                                 ),
                             itemBuilder: (context, i) {
-                              final String catName =
-                                  (filteredCats[i]['name'] ?? '').toString();
-                              final bool selected = currentCat == catName;
+                              String catName = (filteredCats[i]['name'] ?? "")
+                                  .toString();
+                              bool selected = currentCat == catName;
                               return GestureDetector(
                                 onTap: () {
-                                  setState(() => currentCat = catName);
+                                  int newIdx = cats.indexWhere(
+                                    (c) => c['name'] == catName,
+                                  );
+                                  if (newIdx != -1)
+                                    setState(() => currentCat = catName);
                                   Navigator.pop(context);
                                 },
                                 child: AnimatedContainer(
@@ -325,18 +316,21 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                                         : null,
                                     color: selected
                                         ? null
-                                        : const Color(0x0DFFFFFF),
+                                        : Colors.white.withValues(alpha: 0.05),
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
                                       color: selected
                                           ? CafeTheme.primaryBrown
-                                          : const Color(0x405F3814),
+                                          : CafeTheme.primaryBrown.withValues(
+                                              alpha: 0.25,
+                                            ),
                                       width: selected ? 1.5 : 1,
                                     ),
                                     boxShadow: selected
-                                        ? const [
+                                        ? [
                                             BoxShadow(
-                                              color: Color(0x805F3814),
+                                              color: CafeTheme.primaryBrown
+                                                  .withValues(alpha: 0.5),
                                               blurRadius: 15,
                                               spreadRadius: 1,
                                             ),
@@ -453,7 +447,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             decoration: InputDecoration(
               hintText: 'أدخل كلمة السر',
               filled: true,
-              fillColor: const Color(0x14FFFFFF),
+              fillColor: Colors.white.withValues(alpha: 0.08),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(18),
                 borderSide: BorderSide.none,
@@ -553,27 +547,27 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 
   Widget _buildEntryOverlay() {
     return Container(
-      color: const Color(0xF5000000),
+      color: CafeTheme.darkBg.withValues(alpha: 0.96),
       child: Center(
         child: SingleChildScrollView(
           child: Container(
             padding: const EdgeInsets.all(40),
             width: 400,
             decoration: BoxDecoration(
-              color: const Color(0x0DFFFFFF),
+              color: Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(32),
               border: Border.all(
-                color: const Color(0x995F3814),
+                color: CafeTheme.primaryBrown.withValues(alpha: 0.6),
                 width: 1.5,
               ),
-              boxShadow: const [
+              boxShadow: [
                 BoxShadow(
-                  color: Color(0x335F3814),
+                  color: CafeTheme.primaryBrown.withValues(alpha: 0.2),
                   blurRadius: 50,
                   spreadRadius: 5,
                 ),
                 BoxShadow(
-                  color: Color(0x1A987B5C),
+                  color: CafeTheme.secondaryBrown.withValues(alpha: 0.1),
                   blurRadius: 80,
                   spreadRadius: 15,
                 ),
@@ -663,10 +657,10 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       style: const TextStyle(color: Colors.white, fontSize: 16),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Color(0x66FFFFFF)),
+        hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.4)),
         prefixIcon: Icon(icon, color: CafeTheme.accent, size: 22),
         filled: true,
-        fillColor: const Color(0x66000000),
+        fillColor: Colors.black.withValues(alpha: 0.4),
         contentPadding: const EdgeInsets.symmetric(vertical: 20),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(24),
@@ -677,7 +671,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   }
 
   void _validateAndStart() {
-    final String name = _hasSavedName
+    String name = _hasSavedName
         ? registeredName!
         : _nameEntryController.text.trim();
     if (name.isEmpty) {
@@ -724,8 +718,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           shadowColor: Colors.transparent,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
-            side: const BorderSide(
-              color: Color(0x4DFFFFFF),
+            side: BorderSide(
+              color: Colors.white.withValues(alpha: 0.3),
               width: 1,
             ),
           ),
@@ -745,46 +739,65 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             parent: AlwaysScrollableScrollPhysics(),
           ),
           slivers: [
-            // FIX: Header is now isolated — only rebuilds on registeredName/table change
             _buildCinematicHeader(),
             _buildSearchBar(),
             _buildCategoryCarouselSection(),
-            // FIX: Product list section is SliverToBoxAdapter wrapping
-            // a ValueListenableBuilder so search changes only rebuild this widget
             SliverToBoxAdapter(child: _buildProductListSection()),
             const SliverToBoxAdapter(child: SizedBox(height: 350)),
           ],
         ),
         _buildBottomActionArea(),
-        // FIX: FAB uses ValueListenableBuilder — page doesn't rebuild on toggle
         _buildFloatingActionMenu(),
       ],
     );
   }
 
   Widget _buildCinematicHeader() {
-    // FIX: Entire header is a single widget, animation isolated via RepaintBoundary
     return SliverToBoxAdapter(
       child: Container(
         padding: const EdgeInsets.fromLTRB(24, 55, 24, 20),
-        decoration: const BoxDecoration(
-          color: _kSurface85,
-          border: Border(
+        decoration: BoxDecoration(
+          color: CafeTheme.surface.withValues(alpha: 0.85),
+          border: const Border(
             bottom: BorderSide(color: CafeTheme.border, width: 1.5),
           ),
           boxShadow: [
             BoxShadow(
-              color: Color(0x33000000),
+              color: Colors.black.withValues(alpha: 0.2),
               blurRadius: 15,
-              offset: Offset(0, 5),
+              offset: const Offset(0, 5),
             ),
           ],
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Dev badge — fully const, never rebuilds
-            const _DevBadge(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black38,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: CafeTheme.accent.withValues(alpha: 0.4),
+                  width: 1,
+                ),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.code_rounded, color: CafeTheme.accent, size: 18),
+                  SizedBox(width: 6),
+                  Text(
+                    "Dev",
+                    style: TextStyle(
+                      color: CafeTheme.accent,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
             Expanded(
               child: Column(
                 children: [
@@ -824,10 +837,41 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
               children: [
                 GestureDetector(
                   onTap: _changeTableDialog,
-                  child: const _TableButton(),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: CafeTheme.primaryBrown.withValues(alpha: 0.4),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.table_restaurant_rounded,
+                          color: CafeTheme.primaryBrown,
+                          size: 20,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          "الطاولة",
+                          style: TextStyle(
+                            color: CafeTheme.primaryBrown,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 8),
-                // FIX: RepaintBoundary isolates this animated widget
                 RepaintBoundary(
                   child: AnimatedBuilder(
                     animation: _glowController,
@@ -839,7 +883,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0x80000000),
+                          color: Colors.black.withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: CafeTheme.accent.withValues(
@@ -895,31 +939,29 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
         child: Container(
-          decoration: const BoxDecoration(
-            color: _kSurface85,
-            borderRadius: BorderRadius.all(Radius.circular(22)),
-            border: Border.fromBorderSide(
-              BorderSide(color: CafeTheme.border, width: 1.5),
-            ),
+          decoration: BoxDecoration(
+            color: CafeTheme.surface.withValues(alpha: 0.9),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: CafeTheme.border, width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: Color(0x40000000),
+                color: Colors.black.withValues(alpha: 0.25),
                 blurRadius: 12,
-                offset: Offset(0, 4),
+                offset: const Offset(0, 4),
               ),
             ],
           ),
           child: TextField(
             controller: _globalSearchCtrl,
-            // FIX: No setState here — listener on controller updates ValueNotifier instead
+            onChanged: (_) => setState(() {}),
             style: const TextStyle(color: CafeTheme.textMain, fontSize: 16),
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               hintText: "ابحث عن منتج أو قسم...",
               hintStyle: TextStyle(
-                color: Color(0xCC65533E),
+                color: CafeTheme.mutedText.withValues(alpha: 0.8),
                 fontSize: 15,
               ),
-              prefixIcon: Padding(
+              prefixIcon: const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16),
                 child: Icon(
                   Icons.search_rounded,
@@ -928,7 +970,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 ),
               ),
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(vertical: 20),
+              contentPadding: const EdgeInsets.symmetric(vertical: 20),
             ),
           ),
         ),
@@ -936,8 +978,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     );
   }
 
-  // FIX: Categories are sorted ONCE when data arrives, cached in local var
-  // No more inline sort on every stream rebuild
   Widget _buildCategoryCarouselSection() {
     return SliverToBoxAdapter(
       child: StreamBuilder<QuerySnapshot>(
@@ -954,24 +994,18 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
               ),
             );
           }
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
             return const SizedBox(height: 200);
-          }
 
-          // Sort done once per snapshot, not on every build frame
           final cats = snapshot.data!.docs.toList()
             ..sort((a, b) {
-              final aIndex =
-                  (a.data() as Map<String, dynamic>)['index'] ?? 999;
-              final bIndex =
-                  (b.data() as Map<String, dynamic>)['index'] ?? 999;
+              final aIndex = (a.data() as Map<String, dynamic>)['index'] ?? 999;
+              final bIndex = (b.data() as Map<String, dynamic>)['index'] ?? 999;
               return (aIndex as num).compareTo(bIndex as num);
             });
 
-          // FIX: Mutate currentCat without setState — safe here because we're
-          // inside build and the category carousel will reflect the value.
           if (currentCat == null && cats.isNotEmpty) {
-            currentCat = cats.first['name'] as String?;
+            currentCat = cats.first['name'];
           }
 
           return Column(
@@ -1040,17 +1074,17 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       onTap: () => _showCategoriesSheet(cats),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 45, vertical: 16),
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
             colors: [CafeTheme.primaryBrown, Color(0xFF7A4D2A)],
           ),
-          borderRadius: BorderRadius.all(Radius.circular(32)),
+          borderRadius: BorderRadius.circular(32),
           boxShadow: [
             BoxShadow(
-              color: Color(0x805F3814),
+              color: CafeTheme.primaryBrown.withValues(alpha: 0.5),
               blurRadius: 22,
               spreadRadius: 2,
-              offset: Offset(0, 4),
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -1074,7 +1108,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     );
   }
 
-  // FIX: Product list uses ValueListenableBuilder so ONLY this widget rebuilds on search
   Widget _buildProductListSection() {
     if (currentCat == null) return const SizedBox();
 
@@ -1086,154 +1119,141 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       builder: (context, snapshot) {
         if (snapshot.hasError || !snapshot.hasData) return const SizedBox();
 
-        final allItems = snapshot.data!.docs;
+        var items = snapshot.data!.docs;
+        String q = _globalSearchCtrl.text.trim();
+        if (q.isNotEmpty) {
+          items = items.where((doc) {
+            String name = (doc['name'] ?? "").toString();
+            return name.contains(q);
+          }).toList();
+        }
 
-        return ValueListenableBuilder<String>(
-          valueListenable: _searchNotifier,
-          builder: (context, searchQuery, _) {
-            final List<QueryDocumentSnapshot> items = searchQuery.isEmpty
-                ? allItems
-                : allItems.where((doc) {
-                    final String name = (doc['name'] ?? '').toString();
-                    return name.contains(searchQuery);
-                  }).toList();
+        if (items.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.all(50),
+            child: Center(
+              child: Text(
+                "لا توجد منتجات في هذا القسم",
+                style: TextStyle(color: Colors.white54, fontSize: 16),
+              ),
+            ),
+          );
+        }
 
-            if (items.isEmpty) {
-              return const Padding(
-                padding: EdgeInsets.all(50),
-                child: Center(
-                  child: Text(
-                    "لا توجد منتجات في هذا القسم",
-                    style: TextStyle(color: Colors.white54, fontSize: 16),
-                  ),
-                ),
-              );
-            }
-
-            return UFOBeamProductSection(
-              items:
-                  items.map((d) => d.data() as Map<String, dynamic>).toList(),
-              categoryName: currentCat ?? '',
-              onAddItem: _showAddDialog,
-              onQuantityChange: (idx, increase) {
-                setState(() {
-                  if (increase) {
-                    basket[idx]['quantity']++;
-                  } else {
-                    if (basket[idx]['quantity'] > 1) {
-                      basket[idx]['quantity']--;
-                    } else {
-                      basket.removeAt(idx);
-                    }
-                  }
-                });
-              },
-              basket: basket,
-            );
+        return UFOBeamProductSection(
+          items: items.map((d) => d.data() as Map<String, dynamic>).toList(),
+          categoryName: currentCat ?? '',
+          onAddItem: _showAddDialog,
+          onQuantityChange: (idx, increase) {
+            setState(() {
+              if (increase) {
+                basket[idx]['quantity']++;
+              } else {
+                if (basket[idx]['quantity'] > 1) {
+                  basket[idx]['quantity']--;
+                } else {
+                  basket.removeAt(idx);
+                }
+              }
+            });
           },
+          basket: basket,
         );
       },
     );
   }
 
-  // FIX: FAB uses ValueListenableBuilder — page-level setState eliminated for toggle
   Widget _buildFloatingActionMenu() {
     return Positioned(
       bottom: 230,
       left: 24,
-      child: ValueListenableBuilder<bool>(
-        valueListenable: _showQuickMenuNotifier,
-        builder: (context, showMenu, _) {
-          return Column(
-            children: [
-              if (showMenu) ...[
-                _fabOption(
-                  icon: Icons.receipt_long_rounded,
-                  label: "الحساب",
-                  color: CafeTheme.success,
-                  onTap: () {
-                    _showQuickMenuNotifier.value = false;
-                    _requestBill();
-                  },
-                ),
-                const SizedBox(height: 12),
-                _fabOption(
-                  icon: Icons.help_outline_rounded,
-                  label: "مساعدة",
-                  color: CafeTheme.secondaryBrown,
-                  onTap: () {
-                    _showQuickMenuNotifier.value = false;
-                    _showStatusSnackBar(
-                      "جاري إرسال طلب المساعدة... 🙏",
-                      CafeTheme.secondaryBrown,
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
-                _fabOption(
-                  icon: Icons.room_service_rounded,
-                  label: "نداء ويتر",
-                  color: CafeTheme.accent,
-                  onTap: () {
-                    _showQuickMenuNotifier.value = false;
-                    _callWaiter();
-                  },
-                ),
-                const SizedBox(height: 16),
-              ],
-              RepaintBoundary(
-                child: AnimatedBuilder(
-                  animation: _fabPulseController,
-                  builder: (context, _) => GestureDetector(
-                    onTap: () =>
-                        _showQuickMenuNotifier.value = !showMenu,
-                    child: Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: const LinearGradient(
-                          colors: [
-                            CafeTheme.primaryBrown,
-                            CafeTheme.secondaryBrown,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+      child: Column(
+        children: [
+          if (_showQuickMenu) ...[
+            _fabOption(
+              icon: Icons.receipt_long_rounded,
+              label: "الحساب",
+              color: CafeTheme.success,
+              onTap: () {
+                setState(() => _showQuickMenu = false);
+                _requestBill();
+              },
+            ),
+            const SizedBox(height: 12),
+            _fabOption(
+              icon: Icons.help_outline_rounded,
+              label: "مساعدة",
+              color: CafeTheme.secondaryBrown,
+              onTap: () {
+                setState(() => _showQuickMenu = false);
+                _showStatusSnackBar(
+                  "جاري إرسال طلب المساعدة... 🙏",
+                  CafeTheme.secondaryBrown,
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            _fabOption(
+              icon: Icons.room_service_rounded,
+              label: "نداء ويتر",
+              color: CafeTheme.accent,
+              onTap: () {
+                setState(() => _showQuickMenu = false);
+                _callWaiter();
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+          RepaintBoundary(
+            child: AnimatedBuilder(
+              animation: _fabPulseController,
+              builder: (context, _) => GestureDetector(
+                onTap: () => setState(() => _showQuickMenu = !_showQuickMenu),
+                child: Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [
+                        CafeTheme.primaryBrown,
+                        CafeTheme.secondaryBrown,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: CafeTheme.primaryBrown.withValues(
+                          alpha: 0.5 + 0.3 * _fabPulseController.value,
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: CafeTheme.primaryBrown.withValues(
-                              alpha: 0.5 + 0.3 * _fabPulseController.value,
-                            ),
-                            blurRadius: 25,
-                            spreadRadius: 4,
-                          ),
-                        ],
+                        blurRadius: 25,
+                        spreadRadius: 4,
                       ),
-                      child: AnimatedRotation(
-                        turns: showMenu ? 0.02 : 0,
-                        duration: const Duration(milliseconds: 300),
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 220),
-                          transitionBuilder: (child, animation) =>
-                              FadeTransition(opacity: animation, child: child),
-                          child: Icon(
-                            showMenu
-                                ? Icons.close_rounded
-                                : Icons.support_agent_rounded,
-                            key: ValueKey<bool>(showMenu),
-                            color: Colors.white,
-                            size: 30,
-                          ),
-                        ),
+                    ],
+                  ),
+                  child: AnimatedRotation(
+                    turns: _showQuickMenu ? 0.02 : 0,
+                    duration: const Duration(milliseconds: 300),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      transitionBuilder: (child, animation) =>
+                          FadeTransition(opacity: animation, child: child),
+                      child: Icon(
+                        _showQuickMenu
+                            ? Icons.close_rounded
+                            : Icons.support_agent_rounded,
+                        key: ValueKey<bool>(_showQuickMenu),
+                        color: Colors.white,
+                        size: 30,
                       ),
                     ),
                   ),
                 ),
               ),
-            ],
-          );
-        },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1268,7 +1288,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xBF000000),
+              color: Colors.black.withValues(alpha: 0.75),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
             ),
@@ -1313,16 +1333,16 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
           child: Container(
-            decoration: const BoxDecoration(
-              color: Color(0xE60D0804),
-              border: Border(
+            decoration: BoxDecoration(
+              color: const Color(0xFF0D0804).withValues(alpha: 0.90),
+              border: const Border(
                 top: BorderSide(color: CafeTheme.primaryBrown, width: 1.5),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Color(0x665F3814),
+                  color: CafeTheme.primaryBrown.withValues(alpha: 0.4),
                   blurRadius: 30,
-                  offset: Offset(0, -5),
+                  offset: const Offset(0, -5),
                 ),
               ],
             ),
@@ -1348,10 +1368,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           .where('customer_name', isEqualTo: registeredName)
           .snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
           return const SizedBox();
-        }
-        final orders = snapshot.data!.docs;
+        var orders = snapshot.data!.docs;
         return SizedBox(
           height: 125,
           child: ListView.builder(
@@ -1360,30 +1379,35 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             itemCount: orders.length,
             itemBuilder: (c, i) {
-              final data = orders[i].data() as Map<String, dynamic>;
-              final String status = data['status'] ?? "قيد الانتظار";
-              final Color sColor = status == "جاهز"
+              var data = orders[i].data() as Map<String, dynamic>;
+              String status = data['status'] ?? "قيد الانتظار";
+              Color sColor = status == "جاهز"
                   ? Colors.greenAccent
                   : (status == "جاري التجهيز"
-                      ? Colors.orangeAccent
-                      : Colors.white54);
-              final IconData statusIcon = status == "جاهز"
+                        ? Colors.orangeAccent
+                        : Colors.white54);
+              IconData statusIcon = status == "جاهز"
                   ? Icons.check_circle_rounded
                   : (status == "جاري التجهيز"
-                      ? Icons.local_cafe_rounded
-                      : Icons.hourglass_top_rounded);
+                        ? Icons.local_cafe_rounded
+                        : Icons.hourglass_top_rounded);
 
-              // FIX: Pre-computed border/shadow to avoid allocation on every frame
               return Container(
                 width: 170,
                 margin: const EdgeInsets.symmetric(horizontal: 8),
                 decoration: BoxDecoration(
-                  color: const Color(0x0DFFFFFF),
+                  color: Colors.white.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: sColor.withValues(alpha: 0.6),
                     width: 1.5,
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: sColor.withValues(alpha: 0.12),
+                      blurRadius: 12,
+                    ),
+                  ],
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -1432,12 +1456,19 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         itemBuilder: (c, i) => Container(
           width: 170,
           margin: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: const BoxDecoration(
-            color: Color(0x0DFFFFFF),
-            borderRadius: BorderRadius.all(Radius.circular(20)),
-            border: Border.fromBorderSide(
-              BorderSide(color: Color(0x725F3814), width: 1.5),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: CafeTheme.primaryBrown.withValues(alpha: 0.45),
+              width: 1.5,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: CafeTheme.primaryBrown.withValues(alpha: 0.12),
+                blurRadius: 10,
+              ),
+            ],
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -1517,8 +1548,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   }
 
   Widget _buildCheckoutBar() {
-    // FIX: Total computed once, not inline on every build
-    final double total = basket.fold(
+    double total = basket.fold(
       0.0,
       (prev, item) =>
           prev + ((item['price'] as num) * (item['quantity'] as num)),
@@ -1558,13 +1588,13 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           Column(
             children: [
               Container(
-                decoration: const BoxDecoration(
-                  borderRadius: BorderRadius.all(Radius.circular(18)),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
                   boxShadow: [
                     BoxShadow(
-                      color: Color(0x805F3814),
+                      color: CafeTheme.primaryBrown.withValues(alpha: 0.5),
                       blurRadius: 20,
-                      offset: Offset(0, 4),
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
@@ -1638,8 +1668,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
               backgroundColor: const Color(0xFF2E1F10),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(28),
-                side: const BorderSide(
-                  color: Color(0xB25F3814),
+                side: BorderSide(
+                  color: CafeTheme.primaryBrown.withValues(alpha: 0.7),
                   width: 1.5,
                 ),
               ),
@@ -1672,12 +1702,12 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                       runSpacing: 10,
                       alignment: WrapAlignment.end,
                       children: sizes.map((s) {
-                        final bool isSelected = selectedSize == s;
+                        bool isSelected = selectedSize == s;
                         return ChoiceChip(
                           label: Text("${s['name']} - ${s['price']} ج.م"),
                           selected: isSelected,
                           selectedColor: CafeTheme.primaryBrown,
-                          backgroundColor: const Color(0x14FFFFFF),
+                          backgroundColor: Colors.white.withValues(alpha: 0.08),
                           labelStyle: TextStyle(
                             color: isSelected ? Colors.black : Colors.white,
                             fontWeight: FontWeight.w900,
@@ -1707,21 +1737,23 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                     controller: _noteController,
                     textAlign: TextAlign.right,
                     style: const TextStyle(color: Colors.white, fontSize: 15),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       hintText: "أي إضافات تحب نجهزها لك؟",
-                      hintStyle: TextStyle(
+                      hintStyle: const TextStyle(
                         color: Colors.white38,
                         fontSize: 14,
                       ),
                       filled: true,
-                      fillColor: Color(0x14FFFFFF),
-                      contentPadding: EdgeInsets.symmetric(
+                      fillColor: Colors.white.withValues(alpha: 0.08),
+                      contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 16,
                       ),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(16)),
-                        borderSide: BorderSide(color: Color(0x665F3814)),
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: CafeTheme.primaryBrown.withValues(alpha: 0.4),
+                        ),
                       ),
                     ),
                   ),
@@ -1750,15 +1782,14 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                   ),
                   onPressed: () {
                     setState(() {
-                      final String userNote = _noteController.text.isEmpty
+                      String userNote = _noteController.text.isEmpty
                           ? "بدون إضافات"
                           : _noteController.text;
                       String itemName = item['name'];
-                      if (selectedSize != null) {
+                      if (selectedSize != null)
                         itemName += " (${selectedSize!['name']})";
-                      }
 
-                      final int index = basket.indexWhere(
+                      int index = basket.indexWhere(
                         (e) =>
                             e['name'] == itemName &&
                             e['note'] == userNote &&
@@ -1881,9 +1912,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF2E1F10),
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(28)),
-          side: BorderSide(color: CafeTheme.secondaryBrown, width: 1.5),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(28),
+          side: const BorderSide(color: CafeTheme.secondaryBrown, width: 1.5),
         ),
         title: const Text(
           "تغيير الطاولة 🪑",
@@ -1902,13 +1933,13 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             fontSize: 26,
             fontWeight: FontWeight.bold,
           ),
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             hintText: "رقم الطاولة الجديد",
             filled: true,
-            fillColor: Color(0x14FFFFFF),
-            contentPadding: EdgeInsets.symmetric(vertical: 20),
+            fillColor: Colors.white.withValues(alpha: 0.08),
+            contentPadding: const EdgeInsets.symmetric(vertical: 20),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.all(Radius.circular(20)),
+              borderRadius: BorderRadius.circular(20),
               borderSide: BorderSide.none,
             ),
           ),
@@ -1952,84 +1983,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 }
 
 // ==========================================
-// FIX: Extracted as const StatelessWidget — never rebuilds
-// ==========================================
-class _DevBadge extends StatelessWidget {
-  const _DevBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return const DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.black38,
-        borderRadius: BorderRadius.all(Radius.circular(14)),
-        border: Border.fromBorderSide(
-          BorderSide(color: Color(0x66C49A6D), width: 1),
-        ),
-      ),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.code_rounded, color: CafeTheme.accent, size: 18),
-            SizedBox(width: 6),
-            Text(
-              "Dev",
-              style: TextStyle(
-                color: CafeTheme.accent,
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// FIX: Extracted as const StatelessWidget — never rebuilds
-class _TableButton extends StatelessWidget {
-  const _TableButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return const DecoratedBox(
-      decoration: BoxDecoration(
-        color: Color(0x14FFFFFF),
-        borderRadius: BorderRadius.all(Radius.circular(14)),
-        border: Border.fromBorderSide(
-          BorderSide(color: Color(0x665F3814), width: 1.2),
-        ),
-      ),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.table_restaurant_rounded,
-              color: CafeTheme.primaryBrown,
-              size: 20,
-            ),
-            SizedBox(width: 6),
-            Text(
-              "الطاولة",
-              style: TextStyle(
-                color: CafeTheme.primaryBrown,
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ==========================================
 // Cinematic Category Carousel Widget
 // ==========================================
 class CinematicCategoryCarousel extends StatefulWidget {
@@ -2049,11 +2002,9 @@ class CinematicCategoryCarousel extends StatefulWidget {
       _CinematicCategoryCarouselState();
 }
 
-class _CinematicCategoryCarouselState
-    extends State<CinematicCategoryCarousel> {
+class _CinematicCategoryCarouselState extends State<CinematicCategoryCarousel> {
   PageController? _pageController;
-  // FIX: Use a separate notifier so only PageView items rebuilds on scroll
-  final ValueNotifier<double> _currentPageNotifier = ValueNotifier(0);
+  double _currentPage = 0;
   bool _isProgrammaticScroll = false;
   double? _lastScreenWidth;
 
@@ -2070,7 +2021,7 @@ class _CinematicCategoryCarouselState
     _lastScreenWidth = screenWidth;
 
     final double fraction = screenWidth < 400
-        ? 0.42
+        ? 0.42 // تكبير المساحة للكارت
         : screenWidth < 600
         ? 0.36
         : screenWidth < 900
@@ -2082,17 +2033,20 @@ class _CinematicCategoryCarouselState
       viewportFraction: fraction,
       initialPage: _selectedIndex,
     );
-    // FIX: Listener updates ValueNotifier, not setState — avoids full carousel rebuild
     _pageController!.addListener(() {
-      _currentPageNotifier.value = _pageController!.page ?? 0;
+      if (mounted) setState(() => _currentPage = _pageController!.page ?? 0);
     });
     oldCtrl?.dispose();
   }
 
   @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
   void dispose() {
     _pageController?.dispose();
-    _currentPageNotifier.dispose();
     super.dispose();
   }
 
@@ -2100,9 +2054,8 @@ class _CinematicCategoryCarouselState
   void didUpdateWidget(covariant CinematicCategoryCarousel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.selectedCategory == null ||
-        widget.selectedCategory == oldWidget.selectedCategory) {
+        widget.selectedCategory == oldWidget.selectedCategory)
       return;
-    }
     final newIndex = widget.categories.indexWhere(
       (doc) => (doc['name'] ?? '').toString() == widget.selectedCategory,
     );
@@ -2126,6 +2079,7 @@ class _CinematicCategoryCarouselState
 
     if (cats.isEmpty) return const SizedBox(height: 250);
 
+    // تكبير حجم الكاروسيل
     final double carouselHeight = screenWidth < 400
         ? 270
         : screenWidth < 600
@@ -2136,8 +2090,8 @@ class _CinematicCategoryCarouselState
         : screenWidth < 600
         ? 50
         : 48;
-    const double fontSizeActive = 18;
-    const double fontSizeInactive = 15;
+    final double fontSizeActive = screenWidth < 400 ? 18 : 18;
+    final double fontSizeInactive = screenWidth < 400 ? 15 : 15;
 
     return SizedBox(
       height: carouselHeight,
@@ -2150,21 +2104,21 @@ class _CinematicCategoryCarouselState
             bottom: 12,
             child: Container(
               height: 38,
-              decoration: const BoxDecoration(
-                borderRadius: BorderRadius.all(Radius.circular(100)),
-                border: Border.fromBorderSide(
-                  BorderSide(color: Color(0x665F3814)),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(100),
+                border: Border.all(
+                  color: CafeTheme.primaryBrown.withValues(alpha: 0.4),
                 ),
                 gradient: LinearGradient(
                   colors: [
                     Colors.transparent,
-                    Color(0x405F3814),
+                    CafeTheme.primaryBrown.withValues(alpha: 0.25),
                     Colors.transparent,
                   ],
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Color(0x405F3814),
+                    color: CafeTheme.primaryBrown.withValues(alpha: 0.25),
                     blurRadius: 25,
                     spreadRadius: 2,
                   ),
@@ -2173,62 +2127,56 @@ class _CinematicCategoryCarouselState
             ),
           ),
           RepaintBoundary(
-            // FIX: ValueListenableBuilder scopes rebuilds to each card's transform
-            child: ValueListenableBuilder<double>(
-              valueListenable: _currentPageNotifier,
-              builder: (context, currentPage, _) {
-                return PageView.builder(
-                  controller: _pageController!,
-                  itemCount: cats.length,
-                  physics: const BouncingScrollPhysics(
-                    decelerationRate: ScrollDecelerationRate.fast,
-                  ),
-                  padEnds: true,
-                  onPageChanged: (index) {
-                    if (_isProgrammaticScroll) return;
-                    final name = (cats[index]['name'] ?? '').toString();
-                    if (name != widget.selectedCategory) {
-                      widget.onSelect(name);
-                    }
-                  },
-                  itemBuilder: (context, index) {
-                    final doc = cats[index];
-                    final String name = (doc['name'] ?? '').toString();
-                    final double signedDelta = (currentPage - index);
-                    final double diff = signedDelta.abs();
-                    final double scale = (1 - diff * 0.13).clamp(0.80, 1.0);
-                    final double opacity = (1 - diff * 0.20).clamp(0.25, 1.0);
-                    final double curveDrop = (diff * diff * 12).clamp(0.0, 24.0);
-                    final double yRotation =
-                        (signedDelta * 0.20).clamp(-0.50, 0.50);
-                    final bool isSelected = widget.selectedCategory == name;
-                    final bool active = diff < 0.60 || isSelected;
-                    final IconData catIcon = _categoryIconByName(name);
+            child: PageView.builder(
+              controller: _pageController!,
+              itemCount: cats.length,
+              physics: const BouncingScrollPhysics(
+                decelerationRate: ScrollDecelerationRate.fast,
+              ),
+              padEnds: true,
+              onPageChanged: (index) {
+                if (_isProgrammaticScroll) return;
+                final name = (cats[index]['name'] ?? '').toString();
+                if (name != widget.selectedCategory) widget.onSelect(name);
+              },
+              itemBuilder: (context, index) {
+                final doc = cats[index];
+                final String name = (doc['name'] ?? '').toString();
+                final double signedDelta = (_currentPage - index);
+                final double diff = signedDelta.abs();
+                final double scale = (1 - diff * 0.13).clamp(0.80, 1.0);
+                final double opacity = (1 - diff * 0.20).clamp(0.25, 1.0);
+                final double curveDrop = (diff * diff * 12).clamp(0.0, 24.0);
+                final double yRotation = (signedDelta * 0.20).clamp(
+                  -0.50,
+                  0.50,
+                );
+                final bool isSelected = widget.selectedCategory == name;
+                final bool active = diff < 0.60 || isSelected;
+                final IconData catIcon = _categoryIconByName(name);
 
-                    return Transform(
-                      alignment: Alignment.center,
-                      transform: Matrix4.identity()
-                        ..setEntry(3, 2, 0.0012)
-                        ..translate(0.0, curveDrop)
-                        ..rotateY(-yRotation),
-                      child: Transform.scale(
-                        scale: scale,
-                        child: Opacity(
-                          opacity: opacity,
-                          child: _CategoryCard(
-                            name: name,
-                            icon: catIcon,
-                            isSelected: isSelected,
-                            active: active,
-                            iconSize: iconSize,
-                            fontSizeActive: fontSizeActive,
-                            fontSizeInactive: fontSizeInactive,
-                            onTap: () => widget.onSelect(name),
-                          ),
-                        ),
+                return Transform(
+                  alignment: Alignment.center,
+                  transform: Matrix4.identity()
+                    ..setEntry(3, 2, 0.0012)
+                    ..translate(0.0, curveDrop)
+                    ..rotateY(-yRotation),
+                  child: Transform.scale(
+                    scale: scale,
+                    child: Opacity(
+                      opacity: opacity,
+                      child: _CategoryCard(
+                        name: name,
+                        icon: catIcon,
+                        isSelected: isSelected,
+                        active: active,
+                        iconSize: iconSize,
+                        fontSizeActive: fontSizeActive,
+                        fontSizeInactive: fontSizeInactive,
+                        onTap: () => widget.onSelect(name),
                       ),
-                    );
-                  },
+                    ),
+                  ),
                 );
               },
             ),
@@ -2280,45 +2228,47 @@ class _CategoryCardState extends State<_CategoryCard> {
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
           transform: Matrix4.translationValues(0, _isHovered ? -5 : 0, 0),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(32),
-            color: widget.isSelected ? null : const Color(0x4D000000),
+            borderRadius: BorderRadius.circular(32), // زوايا دائرية أكثر
+            color: widget.isSelected
+                ? null
+                : Colors.black.withValues(alpha: 0.3), // شفافية خفيفة
             gradient: widget.isSelected
                 ? LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      const Color(0xF57A4D2A),
+                      const Color(0xFF7A4D2A).withValues(alpha: 0.96),
                       CafeTheme.primaryBrown.withValues(alpha: 0.90),
-                      const Color(0xE05F3814),
+                      const Color(0xFF5F3814).withValues(alpha: 0.88),
                     ],
                   )
                 : null,
             border: Border.all(
               color: widget.isSelected
-                  ? const Color(0xB2987B5C)
+                  ? CafeTheme.secondaryBrown.withValues(alpha: 0.7)
                   : CafeTheme.primaryBrown.withValues(
                       alpha: _isHovered ? 0.4 : 0.2,
                     ),
               width: widget.isSelected ? 2.0 : 1.2,
             ),
             boxShadow: widget.isSelected
-                ? const [
+                ? [
                     BoxShadow(
-                      color: Color(0x59C49A6D),
+                      color: const Color(0xFFC49A6D).withValues(alpha: 0.35),
                       blurRadius: 45,
                       spreadRadius: 2,
                     ),
                     BoxShadow(
-                      color: Color(0x4D5F3814),
+                      color: CafeTheme.primaryBrown.withValues(alpha: 0.3),
                       blurRadius: 30,
                       spreadRadius: 1,
                     ),
                   ]
-                : const [
+                : [
                     BoxShadow(
-                      color: Color(0x33000000),
+                      color: Colors.black.withValues(alpha: 0.2),
                       blurRadius: 12,
-                      offset: Offset(0, 5),
+                      offset: const Offset(0, 5),
                     ),
                   ],
           ),
@@ -2332,7 +2282,7 @@ class _CategoryCardState extends State<_CategoryCard> {
                   size: widget.active ? widget.iconSize : widget.iconSize - 8,
                   color: widget.isSelected
                       ? const Color(0xFFF5E6D3)
-                      : const Color(0xCC5F3814),
+                      : CafeTheme.primaryBrown.withValues(alpha: 0.8),
                 ),
                 const SizedBox(height: 14),
                 Text(
@@ -2359,7 +2309,7 @@ class _CategoryCardState extends State<_CategoryCard> {
 }
 
 // ==========================================
-// PRODUCT SECTION — خفيف وسريع
+// NEON PRODUCT SECTION — خفيف وسريع
 // ==========================================
 class UFOBeamProductSection extends StatelessWidget {
   final List<Map<String, dynamic>> items;
@@ -2398,7 +2348,9 @@ class UFOBeamProductSection extends StatelessWidget {
               inBasket: inBasket,
               qty: inBasket ? (basket[basketIdx]['quantity'] as int) : 0,
               onAdd: () => onAddItem(item),
-              onMinus: inBasket ? () => onQuantityChange(basketIdx, false) : null,
+              onMinus: inBasket
+                  ? () => onQuantityChange(basketIdx, false)
+                  : null,
               onPlus: inBasket ? () => onQuantityChange(basketIdx, true) : null,
             ),
           );
@@ -2409,7 +2361,7 @@ class UFOBeamProductSection extends StatelessWidget {
 }
 
 // ==========================================
-// كارت المنتج مع particle burst
+// كارت المنتج - Premium مع particle burst
 // ==========================================
 class _NeonProductCard extends StatefulWidget {
   final Map<String, dynamic> item;
@@ -2466,16 +2418,15 @@ class _NeonProductCardState extends State<_NeonProductCard>
   void _triggerBurst() {
     _particles.clear();
     for (int i = 0; i < 20; i++) {
-      final double angle =
-          (i / 20) * math.pi * 2 + _rng.nextDouble() * 0.4;
+      final double angle = (i / 20) * math.pi * 2 + _rng.nextDouble() * 0.4;
       final double speed = 45 + _rng.nextDouble() * 60;
       final double size = 4 + _rng.nextDouble() * 5;
-      final Color color = const [
+      final Color color = [
         CafeTheme.primaryBrown,
         CafeTheme.secondaryBrown,
         CafeTheme.success,
         Colors.white,
-        Color(0xFFD4A96A),
+        const Color(0xFFD4A96A),
       ][i % 5];
       _particles.add(
         _Particle(angle: angle, speed: speed, size: size, color: color),
@@ -2491,13 +2442,14 @@ class _NeonProductCardState extends State<_NeonProductCard>
     final bool hasSizes =
         widget.item['sizes'] != null &&
         (widget.item['sizes'] as List).isNotEmpty;
-    final String priceText =
-        hasSizes ? 'أحجام متعددة' : '${widget.item['price']} ج.م';
+    final String priceText = hasSizes
+        ? 'أحجام متعددة'
+        : '${widget.item['price']} ج.م';
     final bool inBasket = widget.inBasket;
-    final Color accent =
-        inBasket ? CafeTheme.success : CafeTheme.primaryBrown;
-    final Color accentDim =
-        inBasket ? const Color(0xFF4CAF50) : const Color(0xFF7A4D2A);
+    final Color accent = inBasket ? CafeTheme.success : CafeTheme.primaryBrown;
+    final Color accentDim = inBasket
+        ? const Color(0xFF4CAF50)
+        : const Color(0xFF7A4D2A);
 
     return Stack(
       clipBehavior: Clip.none,
@@ -2515,27 +2467,31 @@ class _NeonProductCardState extends State<_NeonProductCard>
               0,
             ),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(28),
-              color: const Color(0x66000000),
+              borderRadius: BorderRadius.circular(
+                28,
+              ), // تكبير الـ Border Radius
+              color: Colors.black.withValues(
+                alpha: 0.4,
+              ), // شفافية إضافية للخلفية
               gradient: LinearGradient(
                 begin: Alignment.centerRight,
                 end: Alignment.centerLeft,
                 colors: inBasket
-                    ? const [
-                        Color(0xCC1A2A10),
-                        Color(0xCC0D1A05),
-                        Color(0xE50D0804),
+                    ? [
+                        const Color(0xFF1A2A10).withValues(alpha: 0.8),
+                        const Color(0xFF0D1A05).withValues(alpha: 0.8),
+                        const Color(0xFF0D0804).withValues(alpha: 0.9),
                       ]
                     : _isHovered
-                    ? const [
-                        Color(0xCC251505),
-                        Color(0xCC3A2815),
-                        Color(0xE5120A02),
+                    ? [
+                        const Color(0xFF251505).withValues(alpha: 0.8),
+                        const Color(0xFF3A2815).withValues(alpha: 0.8),
+                        const Color(0xFF120A02).withValues(alpha: 0.9),
                       ]
-                    : const [
-                        Color(0xB21A0F05),
-                        Color(0xB22E1F10),
-                        Color(0xCC0D0804),
+                    : [
+                        const Color(0xFF1A0F05).withValues(alpha: 0.7),
+                        const Color(0xFF2E1F10).withValues(alpha: 0.7),
+                        const Color(0xFF0D0804).withValues(alpha: 0.8),
                       ],
               ),
               border: Border.all(
@@ -2559,10 +2515,11 @@ class _NeonProductCardState extends State<_NeonProductCard>
               borderRadius: BorderRadius.circular(28),
               child: Row(
                 children: [
+                  // شريط لوني جانبي
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 250),
                     width: 6,
-                    height: 120,
+                    height: 120, // تكبير الارتفاع
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
@@ -2579,8 +2536,10 @@ class _NeonProductCardState extends State<_NeonProductCard>
                     ),
                   ),
                   const SizedBox(width: 18),
+                  // الصورة - بحجم أكبر
                   _buildItemImage(widget.item),
                   const SizedBox(width: 20),
+                  // الاسم والسعر
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 22),
@@ -2595,13 +2554,14 @@ class _NeonProductCardState extends State<_NeonProductCard>
                             style: TextStyle(
                               color: inBasket
                                   ? Colors.white
-                                  : const Color(0xF2FFFFFF),
+                                  : Colors.white.withValues(alpha: 0.95),
                               fontWeight: FontWeight.w900,
-                              fontSize: 18,
+                              fontSize: 18, // تكبير الفونت
                               letterSpacing: 0.5,
                             ),
                           ),
                           const SizedBox(height: 10),
+                          // badge السعر
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 14,
@@ -2610,12 +2570,12 @@ class _NeonProductCardState extends State<_NeonProductCard>
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(24),
                               color: hasSizes
-                                  ? const Color(0x26FF9800)
-                                  : const Color(0x264CAF50),
+                                  ? Colors.orange.withValues(alpha: 0.15)
+                                  : CafeTheme.success.withValues(alpha: 0.15),
                               border: Border.all(
                                 color: hasSizes
-                                    ? const Color(0x73FF9800)
-                                    : const Color(0x734CAF50),
+                                    ? Colors.orange.withValues(alpha: 0.45)
+                                    : CafeTheme.success.withValues(alpha: 0.45),
                                 width: 1.0,
                               ),
                             ),
@@ -2649,6 +2609,7 @@ class _NeonProductCardState extends State<_NeonProductCard>
                       ),
                     ),
                   ),
+                  // زر الإضافة / التحكم
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 20,
@@ -2704,46 +2665,46 @@ class _NeonProductCardState extends State<_NeonProductCard>
           ),
         ),
 
+        // badge "في السلة"
         if (inBasket)
-          const Positioned(
+          Positioned(
             top: -8,
             right: 20,
-            child: DecoratedBox(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.all(Radius.circular(24)),
-                gradient: LinearGradient(
+                borderRadius: BorderRadius.circular(24),
+                gradient: const LinearGradient(
                   colors: [CafeTheme.success, Color(0xFF4CAF50)],
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Color(0x994CAF50),
+                    color: CafeTheme.success.withValues(alpha: 0.6),
                     blurRadius: 10,
-                    offset: Offset(0, 2),
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.check_rounded, size: 12, color: Colors.black),
-                    SizedBox(width: 5),
-                    Text(
-                      'في السلة',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5,
-                      ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.check_rounded, size: 12, color: Colors.black),
+                  SizedBox(width: 5),
+                  Text(
+                    'في السلة',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
 
+        // طبقة الجزيئات
         if (_showBurst)
           Positioned(
             left: 0,
@@ -2771,25 +2732,25 @@ class _NeonProductCardState extends State<_NeonProductCard>
     if (imageUrl != null && imageUrl.isNotEmpty) {
       return Container(
         width: 95,
-        height: 95,
-        decoration: const BoxDecoration(
-          borderRadius: BorderRadius.all(Radius.circular(20)),
+        height: 95, // تكبير الصورة
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Color(0x405F3814),
+              color: CafeTheme.primaryBrown.withValues(alpha: 0.25),
               blurRadius: 15,
-              offset: Offset(0, 5),
+              offset: const Offset(0, 5),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: const BorderRadius.all(Radius.circular(20)),
+          borderRadius: BorderRadius.circular(20),
           child: Image.network(
             imageUrl,
             width: 95,
             height: 95,
             fit: BoxFit.cover,
-            cacheWidth: 190,
+            cacheWidth: 190, // تحسين الأداء (Caching)
             cacheHeight: 190,
             loadingBuilder: (context, child, loadingProgress) {
               if (loadingProgress == null) return child;
@@ -2821,18 +2782,19 @@ class _NeonProductCardState extends State<_NeonProductCard>
     return Container(
       width: 95,
       height: 95,
-      decoration: const BoxDecoration(
-        borderRadius: BorderRadius.all(Radius.circular(20)),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0x405F3814),
-            Color(0x26987B5C),
+            CafeTheme.primaryBrown.withValues(alpha: 0.25),
+            CafeTheme.secondaryBrown.withValues(alpha: 0.15),
           ],
         ),
-        border: Border.fromBorderSide(
-          BorderSide(color: Color(0x665F3814), width: 1.5),
+        border: Border.all(
+          color: CafeTheme.primaryBrown.withValues(alpha: 0.40),
+          width: 1.5,
         ),
       ),
       child: const Icon(
@@ -2844,6 +2806,7 @@ class _NeonProductCardState extends State<_NeonProductCard>
   }
 }
 
+// بيانات جسيمة واحدة
 class _Particle {
   final double angle;
   final double speed;
@@ -2857,6 +2820,7 @@ class _Particle {
   });
 }
 
+// الـ Painter بيرسم الجزيئات — بيشتغل مرة واحدة مش loop
 class _ParticleBurstPainter extends CustomPainter {
   final List<_Particle> particles;
   final double progress;
@@ -2869,8 +2833,7 @@ class _ParticleBurstPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final double t = math.sin(progress * math.pi / 2);
-    final double alpha =
-        progress < 0.5 ? 1.0 : 1.0 - ((progress - 0.5) * 2);
+    final double alpha = progress < 0.5 ? 1.0 : 1.0 - ((progress - 0.5) * 2);
     final Offset center = Offset(size.width / 2, size.height / 2);
 
     for (final p in particles) {
@@ -2907,6 +2870,7 @@ class _ParticleBurstPainter extends CustomPainter {
       old.progress != progress;
 }
 
+// زر التحكم في الكمية
 class _QuantityControl extends StatelessWidget {
   final int qty;
   final VoidCallback onMinus;
@@ -2923,9 +2887,9 @@ class _QuantityControl extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        color: const Color(0x14FFFFFF),
+        color: Colors.white.withValues(alpha: 0.08),
         border: Border.all(
-          color: const Color(0x664CAF50),
+          color: CafeTheme.success.withValues(alpha: 0.40),
           width: 1.5,
         ),
       ),
@@ -2968,21 +2932,16 @@ class _QuantityControl extends StatelessWidget {
 
 IconData _categoryIconByName(String name) {
   final normalized = name.toLowerCase();
-  if (normalized.contains('برجر') || normalized.contains('burger')) {
+  if (normalized.contains('برجر') || normalized.contains('burger'))
     return Icons.lunch_dining_rounded;
-  }
-  if (normalized.contains('بيتزا') || normalized.contains('pizza')) {
+  if (normalized.contains('بيتزا') || normalized.contains('pizza'))
     return Icons.local_pizza_rounded;
-  }
-  if (normalized.contains('مكرونة') || normalized.contains('باستا')) {
+  if (normalized.contains('مكرونة') || normalized.contains('باستا'))
     return Icons.ramen_dining_rounded;
-  }
-  if (normalized.contains('مشروب') || normalized.contains('drink')) {
+  if (normalized.contains('مشروب') || normalized.contains('drink'))
     return Icons.local_drink_rounded;
-  }
-  if (normalized.contains('حلويات') || normalized.contains('dessert')) {
+  if (normalized.contains('حلويات') || normalized.contains('dessert'))
     return Icons.cake_rounded;
-  }
   return Icons.restaurant_menu_rounded;
 }
 
@@ -3006,6 +2965,11 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
   final noteCtrl = TextEditingController();
   String? selectedCategory;
   String searchQuery = "";
+
+  @override
+  void initState() {
+    super.initState();
+  }
 
   @override
   void dispose() {
@@ -3044,8 +3008,8 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
               backgroundColor: const Color(0xFF2E1F10),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
-                side: const BorderSide(
-                  color: Color(0xB2987B5C),
+                side: BorderSide(
+                  color: CafeTheme.secondaryBrown.withValues(alpha: 0.7),
                   width: 1.5,
                 ),
               ),
@@ -3076,12 +3040,12 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                       runSpacing: 10,
                       alignment: WrapAlignment.end,
                       children: sizes.map((s) {
-                        final bool isSelected = selectedSize == s;
+                        bool isSelected = selectedSize == s;
                         return ChoiceChip(
                           label: Text("${s['name']} - ${s['price']} ج.م"),
                           selected: isSelected,
                           selectedColor: CafeTheme.secondaryBrown,
-                          backgroundColor: const Color(0x14FFFFFF),
+                          backgroundColor: Colors.white.withValues(alpha: 0.08),
                           labelStyle: TextStyle(
                             color: isSelected ? Colors.black : Colors.white,
                             fontWeight: FontWeight.bold,
@@ -3103,19 +3067,23 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                     controller: noteCtrl,
                     textAlign: TextAlign.right,
                     style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       hintText: "ملاحظات (سكر زيادة، بدون ثلج...)",
-                      hintStyle: TextStyle(
+                      hintStyle: const TextStyle(
                         color: Colors.white38,
                         fontSize: 14,
                       ),
                       filled: true,
-                      fillColor: Color(0x14FFFFFF),
+                      fillColor: Colors.white.withValues(alpha: 0.08),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(16)),
-                        borderSide: BorderSide(color: Color(0x66987B5C)),
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: CafeTheme.secondaryBrown.withValues(
+                            alpha: 0.4,
+                          ),
+                        ),
                       ),
-                      contentPadding: EdgeInsets.symmetric(
+                      contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 16,
                       ),
@@ -3141,15 +3109,14 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                   ),
                   onPressed: () {
                     setState(() {
-                      final String userNote = noteCtrl.text.isEmpty
+                      String userNote = noteCtrl.text.isEmpty
                           ? "بدون ملاحظات"
                           : noteCtrl.text;
                       String itemName = item['name'];
-                      if (selectedSize != null) {
+                      if (selectedSize != null)
                         itemName += " (${selectedSize!['name']})";
-                      }
 
-                      final int index = waiterBasket.indexWhere(
+                      int index = waiterBasket.indexWhere(
                         (e) =>
                             e['name'] == itemName &&
                             e['note'] == userNote &&
@@ -3282,13 +3249,15 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                   controller: tableCtrl,
                   keyboardType: TextInputType.number,
                   style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: "رقم الطاولة",
-                    labelStyle: TextStyle(color: CafeTheme.secondaryBrown),
+                    labelStyle: const TextStyle(
+                      color: CafeTheme.secondaryBrown,
+                    ),
                     filled: true,
-                    fillColor: Color(0x14FFFFFF),
+                    fillColor: Colors.white.withValues(alpha: 0.08),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(16)),
+                      borderRadius: BorderRadius.circular(16),
                       borderSide: BorderSide.none,
                     ),
                   ),
@@ -3299,13 +3268,15 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                 child: TextField(
                   controller: nameCtrl,
                   style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: "اسم العميل",
-                    labelStyle: TextStyle(color: CafeTheme.secondaryBrown),
+                    labelStyle: const TextStyle(
+                      color: CafeTheme.secondaryBrown,
+                    ),
                     filled: true,
-                    fillColor: Color(0x14FFFFFF),
+                    fillColor: Colors.white.withValues(alpha: 0.08),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(16)),
+                      borderRadius: BorderRadius.circular(16),
                       borderSide: BorderSide.none,
                     ),
                   ),
@@ -3320,17 +3291,17 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
             controller: searchCtrl,
             onChanged: (v) => setState(() => searchQuery = v),
             style: const TextStyle(color: Colors.white),
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               hintText: "ابحث عن منتج...",
-              hintStyle: TextStyle(color: Colors.white38),
-              prefixIcon: Icon(
+              hintStyle: const TextStyle(color: Colors.white38),
+              prefixIcon: const Icon(
                 Icons.search,
                 color: CafeTheme.secondaryBrown,
               ),
               filled: true,
-              fillColor: Color(0x14FFFFFF),
+              fillColor: Colors.white.withValues(alpha: 0.08),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.all(Radius.circular(16)),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
               ),
             ),
@@ -3339,14 +3310,13 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
         const SizedBox(height: 16),
         SizedBox(
           height: 45,
-          // FIX: Categories sorted once in builder, not re-sorted on every frame
           child: StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
                 .collection('categories')
                 .snapshots(),
             builder: (context, snapshot) {
               if (!snapshot.hasData) return const SizedBox();
-              final cats = snapshot.data!.docs.toList()
+              var cats = snapshot.data!.docs.toList()
                 ..sort((a, b) {
                   final aIndex =
                       (a.data() as Map<String, dynamic>)['index'] ?? 999;
@@ -3359,9 +3329,9 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 itemCount: cats.length + 1,
                 itemBuilder: (c, i) {
-                  final bool isAll = i == 0;
-                  final String? catName = isAll ? null : cats[i - 1]['name'];
-                  final bool isSelected = selectedCategory == catName;
+                  bool isAll = i == 0;
+                  String? catName = isAll ? null : cats[i - 1]['name'];
+                  bool isSelected = selectedCategory == catName;
                   return GestureDetector(
                     onTap: () => setState(() => selectedCategory = catName),
                     child: AnimatedContainer(
@@ -3374,7 +3344,7 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                       decoration: BoxDecoration(
                         color: isSelected
                             ? CafeTheme.secondaryBrown
-                            : const Color(0x14FFFFFF),
+                            : Colors.white.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(
                           color: isSelected
@@ -3386,8 +3356,7 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                         child: Text(
                           isAll ? "الكل" : (catName ?? ""),
                           style: TextStyle(
-                            color:
-                                isSelected ? Colors.black : Colors.white70,
+                            color: isSelected ? Colors.black : Colors.white70,
                             fontWeight: FontWeight.w900,
                             fontSize: 14,
                           ),
@@ -3417,15 +3386,15 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                   ),
                 );
               }
-              final items = snapshot.data!.docs.where((doc) {
-                final data = doc.data() as Map<String, dynamic>;
-                final String name = (data['name'] ?? '').toString();
+              var items = snapshot.data!.docs.where((doc) {
+                var data = doc.data() as Map<String, dynamic>;
+                String name = (data['name'] ?? "").toString();
                 return name.contains(searchQuery);
               }).toList();
 
-              final double screenWidth = MediaQuery.of(context).size.width;
-              final int crossAxisCount = screenWidth < 600 ? 2 : 4;
-              final double childAspectRatio = screenWidth < 600 ? 0.85 : 1.0;
+              double screenWidth = MediaQuery.of(context).size.width;
+              int crossAxisCount = screenWidth < 600 ? 2 : 4;
+              double childAspectRatio = screenWidth < 600 ? 0.85 : 1.0;
 
               return GridView.builder(
                 padding: const EdgeInsets.all(20),
@@ -3437,30 +3406,30 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                 ),
                 itemCount: items.length,
                 itemBuilder: (context, index) {
-                  final item = items[index].data() as Map<String, dynamic>;
+                  var item = items[index].data() as Map<String, dynamic>;
                   return GestureDetector(
                     onTap: () => _showWaiterAddDialog(item),
                     child: Container(
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
+                        gradient: LinearGradient(
                           colors: [
-                            Color(0x1EFFFFFF),
-                            Color(0x0DFFFFFF),
+                            Colors.white.withValues(alpha: 0.12),
+                            Colors.white.withValues(alpha: 0.05),
                           ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(
-                          color: const Color(0x99C49A6D),
+                          color: CafeTheme.accent.withValues(alpha: 0.6),
                           width: 1.5,
                         ),
-                        boxShadow: const [
+                        boxShadow: [
                           BoxShadow(
-                            color: Color(0x26C49A6D),
+                            color: CafeTheme.accent.withValues(alpha: 0.15),
                             blurRadius: 15,
                             spreadRadius: 1,
-                            offset: Offset(0, 4),
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
@@ -3470,7 +3439,8 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Expanded(
-                              child: item['image_url'] != null &&
+                              child:
+                                  item['image_url'] != null &&
                                       item['image_url'].toString().isNotEmpty
                                   ? Image.network(
                                       item['image_url'],
@@ -3495,11 +3465,13 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                                 horizontal: 14,
                                 vertical: 12,
                               ),
-                              decoration: const BoxDecoration(
-                                color: Color(0xD9000000),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.85),
                                 border: Border(
                                   top: BorderSide(
-                                    color: Color(0x66C49A6D),
+                                    color: CafeTheme.accent.withValues(
+                                      alpha: 0.4,
+                                    ),
                                     width: 1.5,
                                   ),
                                 ),
@@ -3555,8 +3527,7 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
             child: CircularProgressIndicator(color: CafeTheme.secondaryBrown),
           );
         }
-        // FIX: Sort once per snapshot
-        final orders = snapshot.data!.docs.toList()
+        var orders = snapshot.data!.docs.toList()
           ..sort((a, b) {
             final aTime = (a.data() as Map<String, dynamic>)['timestamp'];
             final bTime = (b.data() as Map<String, dynamic>)['timestamp'];
@@ -3577,24 +3548,30 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
           padding: const EdgeInsets.all(20),
           itemCount: orders.length,
           itemBuilder: (context, index) {
-            final data = orders[index].data() as Map<String, dynamic>;
-            final String status = data['status'] ?? "قيد الانتظار";
-            final Color sColor = status == "جاهز"
+            var data = orders[index].data() as Map<String, dynamic>;
+            String status = data['status'] ?? "قيد الانتظار";
+            Color sColor = status == "جاهز"
                 ? Colors.greenAccent
                 : (status == "جاري التجهيز"
-                    ? Colors.orangeAccent
-                    : Colors.white54);
-            final List items = data['items_with_qty'] ?? [];
+                      ? Colors.orangeAccent
+                      : Colors.white54);
+            List items = data['items_with_qty'] ?? [];
 
             return Container(
               margin: const EdgeInsets.symmetric(vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0x0DFFFFFF),
+                color: Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: sColor.withValues(alpha: 0.5),
                   width: 1.5,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: sColor.withValues(alpha: 0.1),
+                    blurRadius: 10,
+                  ),
+                ],
               ),
               child: ExpansionTile(
                 leading: Icon(
@@ -3705,7 +3682,7 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
     String currentStatus,
     String docId,
   ) {
-    final bool isSelected = currentStatus == label;
+    bool isSelected = currentStatus == label;
     return Expanded(
       child: GestureDetector(
         onTap: () async {
@@ -3720,7 +3697,7 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
           decoration: BoxDecoration(
             color: isSelected
                 ? color.withValues(alpha: 0.25)
-                : const Color(0x0DFFFFFF),
+                : Colors.white.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: isSelected ? color : Colors.white24,
@@ -3758,7 +3735,7 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
             ),
           ),
           elevation: 5,
-          shadowColor: const Color(0x4D5F3814),
+          shadowColor: CafeTheme.primaryBrown.withValues(alpha: 0.3),
         ),
         bottomNavigationBar: BottomNavigationBar(
           backgroundColor: CafeTheme.surface,
@@ -3788,17 +3765,17 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
   Widget _buildBasketSummary() {
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: CafeTheme.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-        border: Border(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        border: const Border(
           top: BorderSide(color: CafeTheme.primaryBrown, width: 1.5),
         ),
         boxShadow: [
           BoxShadow(
-            color: Color(0x4D5F3814),
+            color: CafeTheme.primaryBrown.withValues(alpha: 0.3),
             blurRadius: 20,
-            offset: Offset(0, -5),
+            offset: const Offset(0, -5),
           ),
         ],
       ),
@@ -3812,16 +3789,16 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
               physics: const BouncingScrollPhysics(),
               itemCount: waiterBasket.length,
               itemBuilder: (context, index) {
-                final item = waiterBasket[index];
+                var item = waiterBasket[index];
                 return Container(
                   margin: const EdgeInsets.symmetric(vertical: 6),
                   padding: const EdgeInsets.symmetric(
                     vertical: 10,
                     horizontal: 16,
                   ),
-                  decoration: const BoxDecoration(
-                    color: Color(0x14FFFFFF),
-                    borderRadius: BorderRadius.all(Radius.circular(16)),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -3870,8 +3847,7 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                           ),
                         ],
                       ),
-                      if (item['note'] != null &&
-                          item['note'] != "بدون ملاحظات")
+                      if (item['note'] != "بدون ملاحظات")
                         Text(
                           "📝 ${item['note']}",
                           style: const TextStyle(
@@ -3897,7 +3873,7 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                   borderRadius: BorderRadius.circular(16),
                 ),
                 elevation: 5,
-                shadowColor: const Color(0x80987B5C),
+                shadowColor: CafeTheme.secondaryBrown.withValues(alpha: 0.5),
               ),
               onPressed: _sendToBarista,
               child: const Text(
