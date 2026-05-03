@@ -47,6 +47,49 @@ Widget buildstormLogo({double size = 60, Color? color}) {
 }
 
 // ==========================================
+// مكون الخلفية - مفصول لتحسين الأداء (Laveora Style)
+// ==========================================
+class _MenuBackground extends StatelessWidget {
+  const _MenuBackground();
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: RepaintBoundary(
+        child: Stack(
+          children: [
+            Image.asset(
+              localBackgroundImage,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+              cacheWidth: 1920,
+              errorBuilder: (context, error, stackTrace) =>
+                  Container(color: CafeTheme.deepBrown),
+            ),
+            Container(color: CafeTheme.deepBrown.withValues(alpha: 0.93)),
+            Container(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(-0.2, -0.1),
+                  radius: 1.2,
+                  colors: [
+                    CafeTheme.primaryBrown.withValues(alpha: 0.10),
+                    CafeTheme.secondaryBrown.withValues(alpha: 0.06),
+                    Colors.transparent,
+                  ],
+                  stops: const [0.0, 0.5, 1.0],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ==========================================
 // صفحة المنيو الرئيسية
 // ==========================================
 class MenuPage extends StatefulWidget {
@@ -69,7 +112,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   bool _isWaiterAlertActive = false;
   bool _showQuickMenu = false;
 
-  // PERF: kept only the two animations that are visually essential
   late AnimationController _glowController;
   late AnimationController _fabPulseController;
 
@@ -134,177 +176,189 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 
             return ClipRRect(
               borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(28),
+                top: Radius.circular(32),
               ),
-              child: Container(
-                height: MediaQuery.of(context).size.height * 0.75,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2E1F10).withValues(alpha: 0.97),
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(28),
-                  ),
-                  border: const Border(
-                    top: BorderSide(color: CafeTheme.primaryBrown, width: 1.5),
-                    left: BorderSide(color: CafeTheme.primaryBrown, width: 0.5),
-                    right: BorderSide(
-                      color: CafeTheme.primaryBrown,
-                      width: 0.5,
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Container(
+                  height: MediaQuery.of(context).size.height * 0.75,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2E1F10).withValues(alpha: 0.85),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(32),
                     ),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: CafeTheme.primaryBrown.withValues(alpha: 0.3),
-                      blurRadius: 30,
-                      spreadRadius: 5,
+                    border: const Border(
+                      top: BorderSide(
+                        color: CafeTheme.primaryBrown,
+                        width: 1.5,
+                      ),
+                      left: BorderSide(
+                        color: CafeTheme.primaryBrown,
+                        width: 0.5,
+                      ),
+                      right: BorderSide(
+                        color: CafeTheme.primaryBrown,
+                        width: 0.5,
+                      ),
                     ),
-                  ],
-                ),
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    bottom: MediaQuery.of(context).viewInsets.bottom,
-                    left: 20,
-                    right: 20,
-                    top: 15,
+                    boxShadow: [
+                      BoxShadow(
+                        color: CafeTheme.primaryBrown.withValues(alpha: 0.4),
+                        blurRadius: 40,
+                        spreadRadius: 5,
+                      ),
+                    ],
                   ),
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 50,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.of(context).viewInsets.bottom,
+                      left: 20,
+                      right: 20,
+                      top: 15,
+                    ),
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 60,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                CafeTheme.primaryBrown,
+                                CafeTheme.secondaryBrown,
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        const SizedBox(height: 25),
+                        ShaderMask(
+                          shaderCallback: (bounds) => const LinearGradient(
                             colors: [
                               CafeTheme.primaryBrown,
                               CafeTheme.secondaryBrown,
                             ],
-                          ),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      ShaderMask(
-                        shaderCallback: (bounds) => const LinearGradient(
-                          colors: [
-                            CafeTheme.primaryBrown,
-                            CafeTheme.secondaryBrown,
-                          ],
-                        ).createShader(bounds),
-                        child: const Text(
-                          "اختر القسم",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 3,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.06),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: CafeTheme.secondaryBrown.withValues(
-                              alpha: 0.3,
+                          ).createShader(bounds),
+                          child: const Text(
+                            "اختر القسم",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 2,
                             ),
-                            width: 1,
                           ),
                         ),
-                        child: TextField(
-                          controller: _catSearchCtrl,
-                          onChanged: (_) => setSheetState(() {}),
-                          style: const TextStyle(color: Colors.white),
-                          decoration: const InputDecoration(
-                            hintText: "ابحث عن قسم...",
-                            hintStyle: TextStyle(color: Colors.white38),
-                            prefixIcon: Icon(
-                              Icons.search,
-                              color: CafeTheme.secondaryBrown,
-                            ),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(vertical: 14),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      Expanded(
-                        child: GridView.builder(
-                          itemCount: filteredCats.length,
-                          gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: crossAxisCount,
-                                childAspectRatio: childAspectRatio,
-                                crossAxisSpacing: 12,
-                                mainAxisSpacing: 12,
+                        const SizedBox(height: 20),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: CafeTheme.secondaryBrown.withValues(
+                                alpha: 0.4,
                               ),
-                          itemBuilder: (context, i) {
-                            String catName = (filteredCats[i]['name'] ?? "")
-                                .toString();
-                            bool selected = currentCat == catName;
-                            return GestureDetector(
-                              onTap: () {
-                                int newIdx = cats.indexWhere(
-                                  (c) => c['name'] == catName,
-                                );
-                                if (newIdx != -1)
-                                  setState(() => currentCat = catName);
-                                Navigator.pop(context);
-                              },
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 250),
-                                decoration: BoxDecoration(
-                                  gradient: selected
-                                      ? const LinearGradient(
-                                          colors: [
-                                            CafeTheme.primaryBrown,
-                                            CafeTheme.secondaryBrown,
-                                          ],
-                                        )
-                                      : null,
-                                  color: selected
-                                      ? null
-                                      : Colors.white.withValues(alpha: 0.05),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: selected
-                                        ? CafeTheme.primaryBrown
-                                        : CafeTheme.primaryBrown.withValues(
-                                            alpha: 0.25,
-                                          ),
-                                    width: selected ? 1.5 : 1,
-                                  ),
-                                  boxShadow: selected
-                                      ? [
-                                          BoxShadow(
-                                            color: CafeTheme.primaryBrown
-                                                .withValues(alpha: 0.4),
-                                            blurRadius: 12,
-                                          ),
-                                        ]
-                                      : null,
+                              width: 1,
+                            ),
+                          ),
+                          child: TextField(
+                            controller: _catSearchCtrl,
+                            onChanged: (_) => setSheetState(() {}),
+                            style: const TextStyle(color: Colors.white),
+                            decoration: const InputDecoration(
+                              hintText: "ابحث عن قسم...",
+                              hintStyle: TextStyle(color: Colors.white38),
+                              prefixIcon: Icon(
+                                Icons.search,
+                                color: CafeTheme.secondaryBrown,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                vertical: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Expanded(
+                          child: GridView.builder(
+                            itemCount: filteredCats.length,
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: crossAxisCount,
+                                  childAspectRatio: childAspectRatio,
+                                  crossAxisSpacing: 16,
+                                  mainAxisSpacing: 16,
                                 ),
-                                child: Center(
-                                  child: Text(
-                                    catName,
-                                    textAlign: TextAlign.center,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
+                            itemBuilder: (context, i) {
+                              String catName = (filteredCats[i]['name'] ?? "")
+                                  .toString();
+                              bool selected = currentCat == catName;
+                              return GestureDetector(
+                                onTap: () {
+                                  int newIdx = cats.indexWhere(
+                                    (c) => c['name'] == catName,
+                                  );
+                                  if (newIdx != -1)
+                                    setState(() => currentCat = catName);
+                                  Navigator.pop(context);
+                                },
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 250),
+                                  decoration: BoxDecoration(
+                                    gradient: selected
+                                        ? const LinearGradient(
+                                            colors: [
+                                              CafeTheme.primaryBrown,
+                                              CafeTheme.secondaryBrown,
+                                            ],
+                                          )
+                                        : null,
+                                    color: selected
+                                        ? null
+                                        : Colors.white.withValues(alpha: 0.05),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
                                       color: selected
-                                          ? Colors.black
-                                          : Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: screenWidth < 400 ? 15 : 14,
+                                          ? CafeTheme.primaryBrown
+                                          : CafeTheme.primaryBrown.withValues(
+                                              alpha: 0.25,
+                                            ),
+                                      width: selected ? 1.5 : 1,
+                                    ),
+                                    boxShadow: selected
+                                        ? [
+                                            BoxShadow(
+                                              color: CafeTheme.primaryBrown
+                                                  .withValues(alpha: 0.5),
+                                              blurRadius: 15,
+                                              spreadRadius: 1,
+                                            ),
+                                          ]
+                                        : null,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      catName,
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: selected
+                                            ? Colors.black
+                                            : Colors.white,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: screenWidth < 400 ? 16 : 15,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            );
-                          },
+                              );
+                            },
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -342,9 +396,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       _playSound("https://files.catbox.moe/hecpqn.mp3");
   void _playWaiterBell() => _playSound("https://files.catbox.moe/y77se9.mp3");
 
-  void _initStatusListeners() {
-    // Migrated to backend — no direct Firestore access from client
-  }
+  void _initStatusListeners() {}
 
   void _showStatusSnackBar(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -354,12 +406,14 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             color: Colors.black,
+            fontSize: 15,
           ),
         ),
         backgroundColor: color,
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(20),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        margin: const EdgeInsets.all(24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        elevation: 10,
       ),
     );
   }
@@ -374,37 +428,48 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         builder: (context, setDialogState) => AlertDialog(
           backgroundColor: const Color(0xFF2E1F10),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: const BorderSide(color: CafeTheme.primaryBrown, width: 1),
+            borderRadius: BorderRadius.circular(24),
+            side: const BorderSide(color: CafeTheme.primaryBrown, width: 1.5),
           ),
           title: const Text(
             'دخول الويتر 🤵',
             textAlign: TextAlign.center,
-            style: TextStyle(color: CafeTheme.secondaryBrown),
+            style: TextStyle(
+              color: CafeTheme.secondaryBrown,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           content: TextField(
             controller: passwordCtrl,
             obscureText: true,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: Colors.white, fontSize: 18),
             decoration: InputDecoration(
               hintText: 'أدخل كلمة السر',
               filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.05),
+              fillColor: Colors.white.withValues(alpha: 0.08),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(15),
+                borderRadius: BorderRadius.circular(18),
                 borderSide: BorderSide.none,
               ),
+              contentPadding: const EdgeInsets.symmetric(vertical: 18),
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('إلغاء'),
+              child: const Text('إلغاء', style: TextStyle(fontSize: 16)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: CafeTheme.primaryBrown,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
               ),
               onPressed: isLoading
                   ? null
@@ -424,40 +489,38 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                       } on ApiException catch (e) {
                         setDialogState(() => isLoading = false);
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                e.statusCode == 401
-                                    ? 'كلمة السر خاطئة!'
-                                    : 'تعذر التحقق، حاول مرة أخرى',
-                              ),
-                              backgroundColor: Colors.red,
-                            ),
+                          _showStatusSnackBar(
+                            e.statusCode == 401
+                                ? 'كلمة السر خاطئة!'
+                                : 'تعذر التحقق، حاول مرة أخرى',
+                            Colors.red,
                           );
                         }
                       } catch (_) {
                         setDialogState(() => isLoading = false);
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('تعذر الاتصال بالخادم'),
-                              backgroundColor: Colors.red,
-                            ),
+                          _showStatusSnackBar(
+                            'تعذر الاتصال بالخادم',
+                            Colors.red,
                           );
                         }
                       }
                     },
               child: isLoading
                   ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.black,
+                      ),
                     )
                   : const Text(
                       'دخول',
                       style: TextStyle(
                         color: Colors.black,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
                       ),
                     ),
             ),
@@ -488,55 +551,55 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       child: Center(
         child: SingleChildScrollView(
           child: Container(
-            padding: const EdgeInsets.all(35),
-            width: 380,
+            padding: const EdgeInsets.all(40),
+            width: 400,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.04),
-              borderRadius: BorderRadius.circular(24),
+              color: Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(32),
               border: Border.all(
-                color: CafeTheme.primaryBrown.withValues(alpha: 0.55),
+                color: CafeTheme.primaryBrown.withValues(alpha: 0.6),
                 width: 1.5,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: CafeTheme.primaryBrown.withValues(alpha: 0.18),
-                  blurRadius: 40,
-                  spreadRadius: 4,
+                  color: CafeTheme.primaryBrown.withValues(alpha: 0.2),
+                  blurRadius: 50,
+                  spreadRadius: 5,
                 ),
                 BoxShadow(
-                  color: CafeTheme.secondaryBrown.withValues(alpha: 0.08),
-                  blurRadius: 70,
-                  spreadRadius: 10,
+                  color: CafeTheme.secondaryBrown.withValues(alpha: 0.1),
+                  blurRadius: 80,
+                  spreadRadius: 15,
                 ),
               ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                buildstormLogo(size: 100),
-                const SizedBox(height: 10),
+                buildstormLogo(size: 110),
+                const SizedBox(height: 15),
                 const Text(
                   "storm",
                   style: TextStyle(
                     color: CafeTheme.primaryBrown,
-                    fontSize: 32,
+                    fontSize: 36,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 5,
+                    letterSpacing: 6,
                   ),
                 ),
-                const SizedBox(height: 5),
+                const SizedBox(height: 8),
                 const Text(
                   "اطلب وانت في راحتك ⚡",
-                  style: TextStyle(color: Colors.white54, fontSize: 13),
+                  style: TextStyle(color: Colors.white54, fontSize: 15),
                 ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 35),
                 if (!_hasSavedName) ...[
                   _entryField(
                     _nameEntryController,
                     "اسمك الكريم..",
                     Icons.person_outline_rounded,
                   ),
-                  const SizedBox(height: 15),
+                  const SizedBox(height: 18),
                 ],
                 _entryField(
                   _tableEntryController,
@@ -544,31 +607,32 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                   Icons.table_restaurant_rounded,
                   isNumber: true,
                 ),
-                const SizedBox(height: 25),
+                const SizedBox(height: 30),
                 _buildAnimatedButton(
                   onPressed: _validateAndStart,
                   child: const Text(
                     "اكتشف القائمة ⚡",
                     style: TextStyle(
                       color: Colors.black,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 20,
                     ),
                   ),
                 ),
-                const SizedBox(height: 15),
+                const SizedBox(height: 20),
                 TextButton.icon(
                   onPressed: _showWaiterLogin,
                   icon: const Icon(
                     Icons.lock_person,
                     color: CafeTheme.accent,
-                    size: 18,
+                    size: 20,
                   ),
                   label: const Text(
                     "الدخول كويتر",
                     style: TextStyle(
                       color: CafeTheme.accent,
                       fontWeight: FontWeight.bold,
+                      fontSize: 15,
                     ),
                   ),
                 ),
@@ -590,14 +654,16 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       controller: ctrl,
       textAlign: TextAlign.center,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-      style: const TextStyle(color: Colors.white),
+      style: const TextStyle(color: Colors.white, fontSize: 16),
       decoration: InputDecoration(
         hintText: hint,
-        prefixIcon: Icon(icon, color: CafeTheme.accent, size: 20),
+        hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.4)),
+        prefixIcon: Icon(icon, color: CafeTheme.accent, size: 22),
         filled: true,
-        fillColor: Colors.black.withValues(alpha: 0.3),
+        fillColor: Colors.black.withValues(alpha: 0.4),
+        contentPadding: const EdgeInsets.symmetric(vertical: 20),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(24),
           borderSide: BorderSide.none,
         ),
       ),
@@ -632,14 +698,15 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   }) {
     return Container(
       width: double.infinity,
-      height: 60,
+      height: 65,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: color.withValues(alpha: 0.5),
-            blurRadius: 20,
-            spreadRadius: 1,
+            color: color.withValues(alpha: 0.4),
+            blurRadius: 25,
+            spreadRadius: 2,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
@@ -650,10 +717,10 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           foregroundColor: Colors.black,
           shadowColor: Colors.transparent,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(18),
             side: BorderSide(
-              color: Colors.white.withValues(alpha: 0.25),
-              width: 0.5,
+              color: Colors.white.withValues(alpha: 0.3),
+              width: 1,
             ),
           ),
           elevation: 0,
@@ -666,14 +733,17 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   Widget _buildMainContent() {
     return Stack(
       children: [
-        _buildBackground(),
+        const _MenuBackground(),
         CustomScrollView(
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
           slivers: [
             _buildCinematicHeader(),
             _buildSearchBar(),
             _buildCategoryCarouselSection(),
             SliverToBoxAdapter(child: _buildProductListSection()),
-            const SliverToBoxAdapter(child: SizedBox(height: 320)),
+            const SliverToBoxAdapter(child: SizedBox(height: 350)),
           ],
         ),
         _buildBottomActionArea(),
@@ -682,76 +752,47 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildBackground() {
-    return Positioned.fill(
-      child: RepaintBoundary(
-        child: Stack(
-          children: [
-            Image.asset(
-              localBackgroundImage,
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: double.infinity,
-              cacheWidth: 1920,
-              errorBuilder: (context, error, stackTrace) =>
-                  Container(color: CafeTheme.deepBrown),
-            ),
-            Container(color: CafeTheme.deepBrown.withValues(alpha: 0.93)),
-            // PERF: static gradient overlay instead of animated one
-            Container(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: const Alignment(-0.2, -0.1),
-                  radius: 1.2,
-                  colors: [
-                    CafeTheme.primaryBrown.withValues(alpha: 0.10),
-                    CafeTheme.secondaryBrown.withValues(alpha: 0.06),
-                    Colors.transparent,
-                  ],
-                  stops: const [0.0, 0.5, 1.0],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildCinematicHeader() {
     return SliverToBoxAdapter(
       child: Container(
-        padding: const EdgeInsets.fromLTRB(20, 50, 20, 18),
+        padding: const EdgeInsets.fromLTRB(24, 55, 24, 20),
         decoration: BoxDecoration(
-          color: CafeTheme.surface.withValues(alpha: 0.88),
+          color: CafeTheme.surface.withValues(alpha: 0.85),
           border: const Border(
-            bottom: BorderSide(color: CafeTheme.border, width: 1),
+            bottom: BorderSide(color: CafeTheme.border, width: 1.5),
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
+            ),
+          ],
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Dev badge — static, no animation
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.black26,
-                borderRadius: BorderRadius.circular(12),
+                color: Colors.black38,
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: CafeTheme.accent.withValues(alpha: 0.3),
+                  color: CafeTheme.accent.withValues(alpha: 0.4),
+                  width: 1,
                 ),
               ),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.code_rounded, color: CafeTheme.accent, size: 16),
-                  SizedBox(width: 4),
+                  Icon(Icons.code_rounded, color: CafeTheme.accent, size: 18),
+                  SizedBox(width: 6),
                   Text(
                     "Dev",
                     style: TextStyle(
                       color: CafeTheme.accent,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ],
@@ -764,25 +805,29 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                     onTap: () {
                       if (kIsWeb) html.window.location.reload();
                     },
-                    child: buildstormLogo(size: 42),
+                    child: buildstormLogo(size: 48),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   const Text(
                     "storm",
                     style: TextStyle(
                       color: CafeTheme.accent,
                       fontWeight: FontWeight.w900,
-                      letterSpacing: 5,
-                      fontSize: 20,
+                      letterSpacing: 6,
+                      fontSize: 22,
                     ),
                   ),
                   if (registeredName != null && currentTable != null)
-                    Text(
-                      "طاولة $currentTable  |  أهلاً، $registeredName",
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: Colors.white54,
-                        letterSpacing: 0.5,
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        "طاولة $currentTable  |  أهلاً، $registeredName",
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.white70,
+                          letterSpacing: 0.5,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                 ],
@@ -794,14 +839,15 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                   onTap: _changeTableDialog,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 11,
-                      vertical: 8,
+                      horizontal: 14,
+                      vertical: 10,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.white.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: CafeTheme.primaryBrown.withValues(alpha: 0.3),
+                        color: CafeTheme.primaryBrown.withValues(alpha: 0.4),
+                        width: 1.2,
                       ),
                     ),
                     child: const Row(
@@ -810,22 +856,22 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                         Icon(
                           Icons.table_restaurant_rounded,
                           color: CafeTheme.primaryBrown,
-                          size: 18,
+                          size: 20,
                         ),
-                        SizedBox(width: 4),
+                        SizedBox(width: 6),
                         Text(
                           "الطاولة",
                           style: TextStyle(
                             color: CafeTheme.primaryBrown,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 RepaintBoundary(
                   child: AnimatedBuilder(
                     animation: _glowController,
@@ -833,18 +879,29 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                       onTap: _callWaiter,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
+                          horizontal: 12,
+                          vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.4),
-                          borderRadius: BorderRadius.circular(10),
+                          color: Colors.black.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: CafeTheme.accent.withValues(
-                              alpha: 0.4 + (0.6 * _glowController.value),
+                              alpha: 0.5 + (0.5 * _glowController.value),
                             ),
-                            width: 1.5,
+                            width: 1.8,
                           ),
+                          boxShadow: _isWaiterAlertActive
+                              ? [
+                                  BoxShadow(
+                                    color: CafeTheme.accent.withValues(
+                                      alpha: 0.3 * _glowController.value,
+                                    ),
+                                    blurRadius: 10,
+                                    spreadRadius: 1,
+                                  ),
+                                ]
+                              : null,
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -853,15 +910,15 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                               _isWaiterAlertActive ? "جاري.." : "نداء",
                               style: const TextStyle(
                                 color: CafeTheme.accent,
-                                fontSize: 10,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w900,
                               ),
                             ),
-                            const SizedBox(width: 3),
+                            const SizedBox(width: 5),
                             const Icon(
                               Icons.notifications_active_rounded,
                               color: CafeTheme.accent,
-                              size: 14,
+                              size: 16,
                             ),
                           ],
                         ),
@@ -880,36 +937,40 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   Widget _buildSearchBar() {
     return SliverToBoxAdapter(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
         child: Container(
           decoration: BoxDecoration(
-            color: CafeTheme.surface.withValues(alpha: 0.88),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: CafeTheme.border, width: 1),
+            color: CafeTheme.surface.withValues(alpha: 0.9),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: CafeTheme.border, width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.15),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+                color: Colors.black.withValues(alpha: 0.25),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
           child: TextField(
             controller: _globalSearchCtrl,
             onChanged: (_) => setState(() {}),
-            style: const TextStyle(color: CafeTheme.textMain),
+            style: const TextStyle(color: CafeTheme.textMain, fontSize: 16),
             decoration: InputDecoration(
               hintText: "ابحث عن منتج أو قسم...",
               hintStyle: TextStyle(
-                color: CafeTheme.mutedText.withValues(alpha: 0.7),
-                fontSize: 14,
+                color: CafeTheme.mutedText.withValues(alpha: 0.8),
+                fontSize: 15,
               ),
-              prefixIcon: const Icon(
-                Icons.search_rounded,
-                color: CafeTheme.accent,
+              prefixIcon: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: Icon(
+                  Icons.search_rounded,
+                  color: CafeTheme.accent,
+                  size: 24,
+                ),
               ),
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(vertical: 16),
+              contentPadding: const EdgeInsets.symmetric(vertical: 20),
             ),
           ),
         ),
@@ -917,9 +978,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     );
   }
 
-  // ==========================================
-  // الأقسام - بدون orderBy عشان يشتغل بدون index
-  // ==========================================
   Widget _buildCategoryCarouselSection() {
     return SliverToBoxAdapter(
       child: StreamBuilder<QuerySnapshot>(
@@ -927,17 +985,17 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return const SizedBox(
-              height: 180,
+              height: 200,
               child: Center(
                 child: Text(
                   "تعذر تحميل الأقسام حالياً",
-                  style: TextStyle(color: Colors.white54),
+                  style: TextStyle(color: Colors.white54, fontSize: 16),
                 ),
               ),
             );
           }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
-            return const SizedBox(height: 180);
+            return const SizedBox(height: 200);
 
           final cats = snapshot.data!.docs.toList()
             ..sort((a, b) {
@@ -952,33 +1010,33 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 
           return Column(
             children: [
-              const SizedBox(height: 18),
+              const SizedBox(height: 24),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Row(
                   children: [
                     const Icon(
                       Icons.category_rounded,
                       color: CafeTheme.secondaryBrown,
-                      size: 18,
+                      size: 22,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 10),
                     const Text(
                       "القسم الحالي",
                       style: TextStyle(
-                        color: Colors.white54,
-                        fontSize: 12,
+                        color: Colors.white70,
+                        fontSize: 14,
                         letterSpacing: 1.5,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         currentCat ?? "",
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 16,
+                          fontSize: 18,
                           fontWeight: FontWeight.w900,
                         ),
                         maxLines: 1,
@@ -988,8 +1046,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                   ],
                 ),
               ),
+              const SizedBox(height: 16),
               _buildAllCatsButton(cats),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               CinematicCategoryCarousel(
                 categories: cats,
                 selectedCategory: currentCat,
@@ -1002,7 +1061,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                   setState(() => currentCat = catName);
                 },
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
             ],
           );
         },
@@ -1014,31 +1073,32 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     return GestureDetector(
       onTap: () => _showCategoriesSheet(cats),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 45, vertical: 16),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [CafeTheme.primaryBrown, Color(0xFF7A4D2A)],
           ),
-          borderRadius: BorderRadius.circular(30),
+          borderRadius: BorderRadius.circular(32),
           boxShadow: [
             BoxShadow(
-              color: CafeTheme.primaryBrown.withValues(alpha: 0.45),
-              blurRadius: 18,
-              spreadRadius: 1,
+              color: CafeTheme.primaryBrown.withValues(alpha: 0.5),
+              blurRadius: 22,
+              spreadRadius: 2,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.grid_view_rounded, color: Colors.black, size: 18),
-            SizedBox(width: 8),
+            Icon(Icons.grid_view_rounded, color: Colors.black, size: 20),
+            SizedBox(width: 10),
             Text(
               "كل الأقسام",
               style: TextStyle(
                 color: Colors.black,
                 fontWeight: FontWeight.w900,
-                fontSize: 15,
+                fontSize: 16,
                 letterSpacing: 1,
               ),
             ),
@@ -1070,11 +1130,11 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 
         if (items.isEmpty) {
           return const Padding(
-            padding: EdgeInsets.all(40),
+            padding: EdgeInsets.all(50),
             child: Center(
               child: Text(
                 "لا توجد منتجات في هذا القسم",
-                style: TextStyle(color: Colors.white38),
+                style: TextStyle(color: Colors.white54, fontSize: 16),
               ),
             ),
           );
@@ -1103,65 +1163,10 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     );
   }
 
-  // ignore: unused_element
-  Widget _buildQuantityControl(int basketIdx) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        GestureDetector(
-          onTap: () => setState(() {
-            if (basket[basketIdx]['quantity'] > 1) {
-              basket[basketIdx]['quantity']--;
-            } else {
-              basket.removeAt(basketIdx);
-            }
-          }),
-          child: Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(6),
-              color: Colors.redAccent.withValues(alpha: 0.2),
-              border: Border.all(
-                color: Colors.redAccent.withValues(alpha: 0.5),
-              ),
-            ),
-            child: const Icon(Icons.remove, color: Colors.redAccent, size: 14),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-          child: Text(
-            "${basket[basketIdx]['quantity']}",
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-        ),
-        GestureDetector(
-          onTap: () => setState(() => basket[basketIdx]['quantity']++),
-          child: Container(
-            width: 24,
-            height: 24,
-            decoration: const BoxDecoration(
-              borderRadius: BorderRadius.all(Radius.circular(6)),
-              gradient: LinearGradient(
-                colors: [CafeTheme.primaryBrown, CafeTheme.secondaryBrown],
-              ),
-            ),
-            child: const Icon(Icons.add, color: Colors.white, size: 14),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildFloatingActionMenu() {
     return Positioned(
-      bottom: 210,
-      left: 20,
+      bottom: 230,
+      left: 24,
       child: Column(
         children: [
           if (_showQuickMenu) ...[
@@ -1174,7 +1179,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 _requestBill();
               },
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             _fabOption(
               icon: Icons.help_outline_rounded,
               label: "مساعدة",
@@ -1187,7 +1192,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 );
               },
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             _fabOption(
               icon: Icons.room_service_rounded,
               label: "نداء ويتر",
@@ -1197,7 +1202,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 _callWaiter();
               },
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 16),
           ],
           RepaintBoundary(
             child: AnimatedBuilder(
@@ -1205,8 +1210,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
               builder: (context, _) => GestureDetector(
                 onTap: () => setState(() => _showQuickMenu = !_showQuickMenu),
                 child: Container(
-                  width: 54,
-                  height: 54,
+                  width: 60,
+                  height: 60,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: const LinearGradient(
@@ -1220,10 +1225,10 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                     boxShadow: [
                       BoxShadow(
                         color: CafeTheme.primaryBrown.withValues(
-                          alpha: 0.45 + 0.3 * _fabPulseController.value,
+                          alpha: 0.5 + 0.3 * _fabPulseController.value,
                         ),
-                        blurRadius: 20,
-                        spreadRadius: 3,
+                        blurRadius: 25,
+                        spreadRadius: 4,
                       ),
                     ],
                   ),
@@ -1240,7 +1245,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                             : Icons.support_agent_rounded,
                         key: ValueKey<bool>(_showQuickMenu),
                         color: Colors.white,
-                        size: 26,
+                        size: 30,
                       ),
                     ),
                   ),
@@ -1264,34 +1269,35 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       child: Row(
         children: [
           Container(
-            width: 46,
-            height: 46,
+            width: 50,
+            height: 50,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: color.withValues(alpha: 0.15),
+              color: color.withValues(alpha: 0.2),
               border: Border.all(
-                color: color.withValues(alpha: 0.6),
+                color: color.withValues(alpha: 0.7),
                 width: 1.5,
               ),
               boxShadow: [
-                BoxShadow(color: color.withValues(alpha: 0.2), blurRadius: 10),
+                BoxShadow(color: color.withValues(alpha: 0.25), blurRadius: 15),
               ],
             ),
-            child: Icon(icon, color: color, size: 20),
+            child: Icon(icon, color: color, size: 22),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.65),
-              borderRadius: BorderRadius.circular(8),
+              color: Colors.black.withValues(alpha: 0.75),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
             ),
             child: Text(
               label,
               style: TextStyle(
                 color: color,
                 fontWeight: FontWeight.bold,
-                fontSize: 12,
+                fontSize: 14,
               ),
             ),
           ),
@@ -1322,27 +1328,33 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       bottom: 0,
       left: 0,
       right: 0,
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF0D0804).withValues(alpha: 0.97),
-          border: const Border(
-            top: BorderSide(color: CafeTheme.primaryBrown, width: 1.5),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: CafeTheme.primaryBrown.withValues(alpha: 0.3),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF0D0804).withValues(alpha: 0.90),
+              border: const Border(
+                top: BorderSide(color: CafeTheme.primaryBrown, width: 1.5),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: CafeTheme.primaryBrown.withValues(alpha: 0.4),
+                  blurRadius: 30,
+                  offset: const Offset(0, -5),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildActiveOrdersTracker(),
-            _buildBasketRow(),
-            _buildCheckoutBar(),
-          ],
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildActiveOrdersTracker(),
+                _buildBasketRow(),
+                _buildCheckoutBar(),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -1360,10 +1372,11 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           return const SizedBox();
         var orders = snapshot.data!.docs;
         return SizedBox(
-          height: 115,
+          height: 125,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             itemCount: orders.length,
             itemBuilder: (c, i) {
               var data = orders[i].data() as Map<String, dynamic>;
@@ -1372,7 +1385,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                   ? Colors.greenAccent
                   : (status == "جاري التجهيز"
                         ? Colors.orangeAccent
-                        : Colors.white38);
+                        : Colors.white54);
               IconData statusIcon = status == "جاهز"
                   ? Icons.check_circle_rounded
                   : (status == "جاري التجهيز"
@@ -1380,41 +1393,45 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                         : Icons.hourglass_top_rounded);
 
               return Container(
-                width: 160,
-                margin: const EdgeInsets.symmetric(horizontal: 6),
+                width: 170,
+                margin: const EdgeInsets.symmetric(horizontal: 8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.04),
-                  borderRadius: BorderRadius.circular(16),
+                  color: Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: sColor.withValues(alpha: 0.5),
-                    width: 1,
+                    color: sColor.withValues(alpha: 0.6),
+                    width: 1.5,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: sColor.withValues(alpha: 0.08),
-                      blurRadius: 8,
+                      color: sColor.withValues(alpha: 0.12),
+                      blurRadius: 12,
                     ),
                   ],
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(statusIcon, color: sColor, size: 24),
-                    const SizedBox(height: 5),
+                    Icon(statusIcon, color: sColor, size: 28),
+                    const SizedBox(height: 8),
                     Text(
                       status,
                       style: TextStyle(
                         color: sColor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
                       ),
                     ),
                     if (data['items_with_qty'] != null)
-                      Text(
-                        "${(data['items_with_qty'] as List).length} صنف",
-                        style: const TextStyle(
-                          color: Colors.white38,
-                          fontSize: 10,
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          "${(data['items_with_qty'] as List).length} صنف",
+                          style: const TextStyle(
+                            color: Colors.white54,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                   ],
@@ -1430,40 +1447,45 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   Widget _buildBasketRow() {
     if (basket.isEmpty) return const SizedBox();
     return SizedBox(
-      height: 130,
+      height: 140,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.only(top: 12, left: 18, right: 18),
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.only(top: 14, left: 24, right: 24),
         itemCount: basket.length,
         itemBuilder: (c, i) => Container(
-          width: 160,
-          margin: const EdgeInsets.symmetric(horizontal: 6),
+          width: 170,
+          margin: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.04),
-            borderRadius: BorderRadius.circular(16),
+            color: Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: CafeTheme.primaryBrown.withValues(alpha: 0.35),
+              color: CafeTheme.primaryBrown.withValues(alpha: 0.45),
+              width: 1.5,
             ),
             boxShadow: [
               BoxShadow(
-                color: CafeTheme.primaryBrown.withValues(alpha: 0.08),
-                blurRadius: 6,
+                color: CafeTheme.primaryBrown.withValues(alpha: 0.12),
+                blurRadius: 10,
               ),
             ],
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                basket[i]['name'],
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  basket[i]['name'],
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                 ),
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -1471,7 +1493,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                     icon: const Icon(
                       Icons.remove_circle_outline,
                       color: Colors.redAccent,
-                      size: 20,
+                      size: 24,
                     ),
                     onPressed: () => setState(() {
                       if (basket[i]['quantity'] > 1) {
@@ -1484,12 +1506,12 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                     constraints: const BoxConstraints(),
                   ),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Text(
                       "${basket[i]['quantity']}",
                       style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
                   ),
@@ -1497,7 +1519,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                     icon: const Icon(
                       Icons.add_circle_outline,
                       color: Colors.greenAccent,
-                      size: 20,
+                      size: 24,
                     ),
                     onPressed: () => setState(() => basket[i]['quantity']++),
                     padding: EdgeInsets.zero,
@@ -1506,13 +1528,17 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 ],
               ),
               if (basket[i]['note'] != "بدون إضافات")
-                Text(
-                  "📝 ${basket[i]['note']}",
-                  style: const TextStyle(
-                    fontSize: 9,
-                    color: Colors.orangeAccent,
+                Padding(
+                  padding: const EdgeInsets.only(top: 6, left: 8, right: 8),
+                  child: Text(
+                    "📝 ${basket[i]['note']}",
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Colors.orangeAccent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
             ],
           ),
@@ -1528,7 +1554,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           prev + ((item['price'] as num) * (item['quantity'] as num)),
     );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(30, 14, 30, 45),
+      padding: const EdgeInsets.fromLTRB(30, 20, 30, 50),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -1537,20 +1563,25 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             children: [
               const Text(
                 "المبلغ الحالي",
-                style: TextStyle(color: Colors.white38, fontSize: 11),
+                style: TextStyle(
+                  color: Colors.white54,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               Text(
                 "${total.toStringAsFixed(2)} ج.م",
                 style: const TextStyle(
-                  fontSize: 26,
+                  fontSize: 28,
                   fontWeight: FontWeight.w900,
                   color: CafeTheme.accent,
+                  letterSpacing: 1,
                 ),
               ),
               if (basket.isNotEmpty)
                 Text(
                   "${basket.length} صنف",
-                  style: const TextStyle(color: Colors.white38, fontSize: 10),
+                  style: const TextStyle(color: Colors.white54, fontSize: 12),
                 ),
             ],
           ),
@@ -1558,11 +1589,12 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             children: [
               Container(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(18),
                   boxShadow: [
                     BoxShadow(
-                      color: CafeTheme.primaryBrown.withValues(alpha: 0.45),
-                      blurRadius: 15,
+                      color: CafeTheme.primaryBrown.withValues(alpha: 0.5),
+                      blurRadius: 20,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
@@ -1572,34 +1604,41 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                     backgroundColor: CafeTheme.primaryBrown,
                     foregroundColor: Colors.black,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 30,
-                      vertical: 15,
+                      horizontal: 35,
+                      vertical: 18,
                     ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(18),
                     ),
                     elevation: 0,
                   ),
                   child: const Text(
                     "تأكيد الطلب ⚡",
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
                   ),
                 ),
               ),
               if (basket.isNotEmpty)
-                TextButton.icon(
-                  onPressed: () {
-                    setState(() => basket.clear());
-                    _showStatusSnackBar("تم مسح السلة", Colors.redAccent);
-                  },
-                  icon: const Icon(
-                    Icons.delete_outline,
-                    color: Colors.redAccent,
-                    size: 14,
-                  ),
-                  label: const Text(
-                    "مسح السلة",
-                    style: TextStyle(color: Colors.redAccent, fontSize: 11),
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: TextButton.icon(
+                    onPressed: () {
+                      setState(() => basket.clear());
+                      _showStatusSnackBar("تم مسح السلة", Colors.redAccent);
+                    },
+                    icon: const Icon(
+                      Icons.delete_outline,
+                      color: Colors.redAccent,
+                      size: 18,
+                    ),
+                    label: const Text(
+                      "مسح السلة",
+                      style: TextStyle(
+                        color: Colors.redAccent,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
             ],
@@ -1628,10 +1667,10 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             return AlertDialog(
               backgroundColor: const Color(0xFF2E1F10),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(28),
                 side: BorderSide(
-                  color: CafeTheme.primaryBrown.withValues(alpha: 0.6),
-                  width: 1,
+                  color: CafeTheme.primaryBrown.withValues(alpha: 0.7),
+                  width: 1.5,
                 ),
               ),
               title: Text(
@@ -1639,7 +1678,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 textAlign: TextAlign.right,
                 style: const TextStyle(
                   color: CafeTheme.secondaryBrown,
-                  fontSize: 16,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
               content: Column(
@@ -1653,12 +1693,13 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                       style: TextStyle(
                         color: Colors.white70,
                         fontWeight: FontWeight.bold,
+                        fontSize: 15,
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                      spacing: 10,
+                      runSpacing: 10,
                       alignment: WrapAlignment.end,
                       children: sizes.map((s) {
                         bool isSelected = selectedSize == s;
@@ -1666,10 +1707,18 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                           label: Text("${s['name']} - ${s['price']} ج.م"),
                           selected: isSelected,
                           selectedColor: CafeTheme.primaryBrown,
-                          backgroundColor: Colors.white.withValues(alpha: 0.05),
+                          backgroundColor: Colors.white.withValues(alpha: 0.08),
                           labelStyle: TextStyle(
                             color: isSelected ? Colors.black : Colors.white,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w900,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(
+                              color: isSelected
+                                  ? CafeTheme.primaryBrown
+                                  : Colors.transparent,
+                            ),
                           ),
                           onSelected: (bool selected) {
                             if (selected) {
@@ -1682,39 +1731,53 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                         );
                       }).toList(),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
                   ],
                   TextField(
                     controller: _noteController,
                     textAlign: TextAlign.right,
+                    style: const TextStyle(color: Colors.white, fontSize: 15),
                     decoration: InputDecoration(
                       hintText: "أي إضافات تحب نجهزها لك؟",
                       hintStyle: const TextStyle(
-                        color: Colors.white24,
-                        fontSize: 13,
+                        color: Colors.white38,
+                        fontSize: 14,
                       ),
                       filled: true,
-                      fillColor: Colors.white.withValues(alpha: 0.05),
+                      fillColor: Colors.white.withValues(alpha: 0.08),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(16),
                         borderSide: BorderSide(
-                          color: CafeTheme.primaryBrown.withValues(alpha: 0.3),
+                          color: CafeTheme.primaryBrown.withValues(alpha: 0.4),
                         ),
                       ),
                     ),
                   ),
                 ],
               ),
+              actionsPadding: const EdgeInsets.only(
+                bottom: 20,
+                right: 20,
+                left: 20,
+              ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text("إلغاء"),
+                  child: const Text("إلغاء", style: TextStyle(fontSize: 16)),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: CafeTheme.primaryBrown,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                   onPressed: () {
@@ -1755,7 +1818,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                     "إضافة",
                     style: TextStyle(
                       color: Colors.black,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
                     ),
                   ),
                 ),
@@ -1849,25 +1913,33 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF2E1F10),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: CafeTheme.secondaryBrown, width: 1),
+          borderRadius: BorderRadius.circular(28),
+          side: const BorderSide(color: CafeTheme.secondaryBrown, width: 1.5),
         ),
         title: const Text(
           "تغيير الطاولة 🪑",
           textAlign: TextAlign.center,
-          style: TextStyle(color: CafeTheme.secondaryBrown),
+          style: TextStyle(
+            color: CafeTheme.secondaryBrown,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         content: TextField(
           controller: _tableEntryController,
           textAlign: TextAlign.center,
           keyboardType: TextInputType.number,
-          style: const TextStyle(color: Colors.white, fontSize: 24),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 26,
+            fontWeight: FontWeight.bold,
+          ),
           decoration: InputDecoration(
             hintText: "رقم الطاولة الجديد",
             filled: true,
-            fillColor: Colors.white.withValues(alpha: 0.05),
+            fillColor: Colors.white.withValues(alpha: 0.08),
+            contentPadding: const EdgeInsets.symmetric(vertical: 20),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
+              borderRadius: BorderRadius.circular(20),
               borderSide: BorderSide.none,
             ),
           ),
@@ -1875,11 +1947,15 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("إلغاء"),
+            child: const Text("إلغاء", style: TextStyle(fontSize: 16)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: CafeTheme.secondaryBrown,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             onPressed: () {
               if (_tableEntryController.text.isNotEmpty) {
@@ -1895,7 +1971,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
               "تحديث",
               style: TextStyle(
                 color: Colors.black,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w900,
+                fontSize: 16,
               ),
             ),
           ),
@@ -1944,12 +2021,12 @@ class _CinematicCategoryCarouselState extends State<CinematicCategoryCarousel> {
     _lastScreenWidth = screenWidth;
 
     final double fraction = screenWidth < 400
-        ? 0.38
+        ? 0.42 // تكبير المساحة للكارت
         : screenWidth < 600
-        ? 0.32
+        ? 0.36
         : screenWidth < 900
-        ? 0.24
-        : 0.20;
+        ? 0.28
+        : 0.24;
 
     final oldCtrl = _pageController;
     _pageController = PageController(
@@ -2000,21 +2077,21 @@ class _CinematicCategoryCarouselState extends State<CinematicCategoryCarousel> {
     final double screenWidth = MediaQuery.of(context).size.width;
     _initController(screenWidth);
 
-    if (cats.isEmpty) return const SizedBox(height: 200);
+    if (cats.isEmpty) return const SizedBox(height: 250);
 
-    // PERF: Slightly larger cards for better visual weight
+    // تكبير حجم الكاروسيل
     final double carouselHeight = screenWidth < 400
-        ? 230
+        ? 270
         : screenWidth < 600
-        ? 215
-        : 195;
+        ? 260
+        : 240;
     final double iconSize = screenWidth < 400
-        ? 46
+        ? 55
         : screenWidth < 600
-        ? 42
-        : 40;
-    final double fontSizeActive = screenWidth < 400 ? 16 : 16;
-    final double fontSizeInactive = screenWidth < 400 ? 13 : 13;
+        ? 50
+        : 48;
+    final double fontSizeActive = screenWidth < 400 ? 18 : 18;
+    final double fontSizeInactive = screenWidth < 400 ? 15 : 15;
 
     return SizedBox(
       height: carouselHeight,
@@ -2024,9 +2101,9 @@ class _CinematicCategoryCarouselState extends State<CinematicCategoryCarousel> {
           Positioned(
             left: 24,
             right: 24,
-            bottom: 8,
+            bottom: 12,
             child: Container(
-              height: 32,
+              height: 38,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(100),
                 border: Border.all(
@@ -2035,15 +2112,15 @@ class _CinematicCategoryCarouselState extends State<CinematicCategoryCarousel> {
                 gradient: LinearGradient(
                   colors: [
                     Colors.transparent,
-                    CafeTheme.primaryBrown.withValues(alpha: 0.20),
+                    CafeTheme.primaryBrown.withValues(alpha: 0.25),
                     Colors.transparent,
                   ],
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: CafeTheme.primaryBrown.withValues(alpha: 0.2),
-                    blurRadius: 20,
-                    spreadRadius: 1.5,
+                    color: CafeTheme.primaryBrown.withValues(alpha: 0.25),
+                    blurRadius: 25,
+                    spreadRadius: 2,
                   ),
                 ],
               ),
@@ -2088,110 +2165,15 @@ class _CinematicCategoryCarouselState extends State<CinematicCategoryCarousel> {
                     scale: scale,
                     child: Opacity(
                       opacity: opacity,
-                      child: GestureDetector(
+                      child: _CategoryCard(
+                        name: name,
+                        icon: catIcon,
+                        isSelected: isSelected,
+                        active: active,
+                        iconSize: iconSize,
+                        fontSizeActive: fontSizeActive,
+                        fontSizeInactive: fontSizeInactive,
                         onTap: () => widget.onSelect(name),
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(24),
-                            color: isSelected
-                                ? null
-                                : Colors.white.withValues(alpha: 0.03),
-                            gradient: isSelected
-                                ? LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      const Color(
-                                        0xFF7A4D2A,
-                                      ).withValues(alpha: 0.96),
-                                      CafeTheme.primaryBrown.withValues(
-                                        alpha: 0.90,
-                                      ),
-                                      const Color(
-                                        0xFF5F3814,
-                                      ).withValues(alpha: 0.88),
-                                    ],
-                                  )
-                                : null,
-                            border: Border.all(
-                              color: isSelected
-                                  ? CafeTheme.secondaryBrown.withValues(
-                                      alpha: 0.66,
-                                    )
-                                  : CafeTheme.primaryBrown.withValues(
-                                      alpha: 0.18,
-                                    ),
-                              width: isSelected ? 1.5 : 1.0,
-                            ),
-                            boxShadow: isSelected
-                                ? [
-                                    BoxShadow(
-                                      color: const Color(
-                                        0xFFC49A6D,
-                                      ).withValues(alpha: 0.32),
-                                      blurRadius: 40,
-                                      spreadRadius: 2,
-                                    ),
-                                    BoxShadow(
-                                      color: CafeTheme.primaryBrown.withValues(
-                                        alpha: 0.28,
-                                      ),
-                                      blurRadius: 28,
-                                      spreadRadius: 1,
-                                    ),
-                                  ]
-                                : [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.12,
-                                      ),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ],
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 14,
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  catIcon,
-                                  size: active ? iconSize : iconSize - 6,
-                                  color: isSelected
-                                      ? const Color(0xFFF5E6D3)
-                                      : CafeTheme.primaryBrown.withValues(
-                                          alpha: 0.75,
-                                        ),
-                                ),
-                                const SizedBox(height: 10),
-                                Text(
-                                  name,
-                                  textAlign: TextAlign.center,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 0.8,
-                                    fontSize: active
-                                        ? fontSizeActive
-                                        : fontSizeInactive,
-                                    color: isSelected
-                                        ? Colors.white
-                                        : Colors.white70,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
                       ),
                     ),
                   ),
@@ -2200,6 +2182,127 @@ class _CinematicCategoryCarouselState extends State<CinematicCategoryCarousel> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CategoryCard extends StatefulWidget {
+  final String name;
+  final IconData icon;
+  final bool isSelected;
+  final bool active;
+  final double iconSize;
+  final double fontSizeActive;
+  final double fontSizeInactive;
+  final VoidCallback onTap;
+
+  const _CategoryCard({
+    required this.name,
+    required this.icon,
+    required this.isSelected,
+    required this.active,
+    required this.iconSize,
+    required this.fontSizeActive,
+    required this.fontSizeInactive,
+    required this.onTap,
+  });
+
+  @override
+  State<_CategoryCard> createState() => _CategoryCardState();
+}
+
+class _CategoryCardState extends State<_CategoryCard> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOutCubic,
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+          transform: Matrix4.translationValues(0, _isHovered ? -5 : 0, 0),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(32), // زوايا دائرية أكثر
+            color: widget.isSelected
+                ? null
+                : Colors.black.withValues(alpha: 0.3), // شفافية خفيفة
+            gradient: widget.isSelected
+                ? LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      const Color(0xFF7A4D2A).withValues(alpha: 0.96),
+                      CafeTheme.primaryBrown.withValues(alpha: 0.90),
+                      const Color(0xFF5F3814).withValues(alpha: 0.88),
+                    ],
+                  )
+                : null,
+            border: Border.all(
+              color: widget.isSelected
+                  ? CafeTheme.secondaryBrown.withValues(alpha: 0.7)
+                  : CafeTheme.primaryBrown.withValues(
+                      alpha: _isHovered ? 0.4 : 0.2,
+                    ),
+              width: widget.isSelected ? 2.0 : 1.2,
+            ),
+            boxShadow: widget.isSelected
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFFC49A6D).withValues(alpha: 0.35),
+                      blurRadius: 45,
+                      spreadRadius: 2,
+                    ),
+                    BoxShadow(
+                      color: CafeTheme.primaryBrown.withValues(alpha: 0.3),
+                      blurRadius: 30,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 12,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  widget.icon,
+                  size: widget.active ? widget.iconSize : widget.iconSize - 8,
+                  color: widget.isSelected
+                      ? const Color(0xFFF5E6D3)
+                      : CafeTheme.primaryBrown.withValues(alpha: 0.8),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  widget.name,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.0,
+                    fontSize: widget.active
+                        ? widget.fontSizeActive
+                        : widget.fontSizeInactive,
+                    color: widget.isSelected ? Colors.white : Colors.white70,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -2228,7 +2331,7 @@ class UFOBeamProductSection extends StatelessWidget {
   Widget build(BuildContext context) {
     if (items.isEmpty) return const SizedBox();
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: ListView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
@@ -2314,10 +2417,10 @@ class _NeonProductCardState extends State<_NeonProductCard>
 
   void _triggerBurst() {
     _particles.clear();
-    for (int i = 0; i < 18; i++) {
-      final double angle = (i / 18) * math.pi * 2 + _rng.nextDouble() * 0.4;
-      final double speed = 40 + _rng.nextDouble() * 55;
-      final double size = 3 + _rng.nextDouble() * 4;
+    for (int i = 0; i < 20; i++) {
+      final double angle = (i / 20) * math.pi * 2 + _rng.nextDouble() * 0.4;
+      final double speed = 45 + _rng.nextDouble() * 60;
+      final double size = 4 + _rng.nextDouble() * 5;
       final Color color = [
         CafeTheme.primaryBrown,
         CafeTheme.secondaryBrown,
@@ -2355,58 +2458,68 @@ class _NeonProductCardState extends State<_NeonProductCard>
           onEnter: (_) => setState(() => _isHovered = true),
           onExit: (_) => setState(() => _isHovered = false),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
+            duration: const Duration(milliseconds: 300),
             curve: Curves.easeOutCubic,
-            margin: const EdgeInsets.only(bottom: 14),
+            margin: const EdgeInsets.only(bottom: 20),
+            transform: Matrix4.translationValues(
+              0,
+              _isHovered && !inBasket ? -4 : 0,
+              0,
+            ),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(
+                28,
+              ), // تكبير الـ Border Radius
+              color: Colors.black.withValues(
+                alpha: 0.4,
+              ), // شفافية إضافية للخلفية
               gradient: LinearGradient(
                 begin: Alignment.centerRight,
                 end: Alignment.centerLeft,
                 colors: inBasket
                     ? [
-                        const Color(0xFF1A2A10),
-                        const Color(0xFF0D1A05),
-                        const Color(0xFF0D0804),
+                        const Color(0xFF1A2A10).withValues(alpha: 0.8),
+                        const Color(0xFF0D1A05).withValues(alpha: 0.8),
+                        const Color(0xFF0D0804).withValues(alpha: 0.9),
                       ]
                     : _isHovered
                     ? [
-                        const Color(0xFF251505),
-                        const Color(0xFF3A2815),
-                        const Color(0xFF120A02),
+                        const Color(0xFF251505).withValues(alpha: 0.8),
+                        const Color(0xFF3A2815).withValues(alpha: 0.8),
+                        const Color(0xFF120A02).withValues(alpha: 0.9),
                       ]
                     : [
-                        const Color(0xFF1A0F05),
-                        const Color(0xFF2E1F10),
-                        const Color(0xFF0D0804),
+                        const Color(0xFF1A0F05).withValues(alpha: 0.7),
+                        const Color(0xFF2E1F10).withValues(alpha: 0.7),
+                        const Color(0xFF0D0804).withValues(alpha: 0.8),
                       ],
               ),
               border: Border.all(
                 color: accent.withValues(
-                  alpha: inBasket ? 0.70 : (_isHovered ? 0.40 : 0.22),
+                  alpha: inBasket ? 0.80 : (_isHovered ? 0.50 : 0.25),
                 ),
-                width: inBasket ? 1.5 : (_isHovered ? 1.2 : 1.0),
+                width: inBasket ? 2.0 : (_isHovered ? 1.5 : 1.2),
               ),
               boxShadow: [
                 BoxShadow(
                   color: accent.withValues(
-                    alpha: inBasket ? 0.28 : (_isHovered ? 0.15 : 0.08),
+                    alpha: inBasket ? 0.35 : (_isHovered ? 0.20 : 0.05),
                   ),
-                  blurRadius: inBasket ? 22 : (_isHovered ? 14 : 8),
-                  spreadRadius: inBasket ? 1 : 0,
-                  offset: const Offset(0, 4),
+                  blurRadius: inBasket ? 25 : (_isHovered ? 18 : 10),
+                  spreadRadius: inBasket ? 2 : 0,
+                  offset: const Offset(0, 5),
                 ),
               ],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(28),
               child: Row(
                 children: [
                   // شريط لوني جانبي
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 250),
-                    width: 5,
-                    height: 96,
+                    width: 6,
+                    height: 120, // تكبير الارتفاع
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
@@ -2415,21 +2528,21 @@ class _NeonProductCardState extends State<_NeonProductCard>
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: accent.withValues(alpha: 0.7),
-                          blurRadius: 8,
-                          spreadRadius: 1,
+                          color: accent.withValues(alpha: 0.8),
+                          blurRadius: 10,
+                          spreadRadius: 2,
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 14),
-                  // الصورة
+                  const SizedBox(width: 18),
+                  // الصورة - بحجم أكبر
                   _buildItemImage(widget.item),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 20),
                   // الاسم والسعر
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      padding: const EdgeInsets.symmetric(vertical: 22),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -2441,29 +2554,29 @@ class _NeonProductCardState extends State<_NeonProductCard>
                             style: TextStyle(
                               color: inBasket
                                   ? Colors.white
-                                  : Colors.white.withValues(alpha: 0.92),
+                                  : Colors.white.withValues(alpha: 0.95),
                               fontWeight: FontWeight.w900,
-                              fontSize: 15,
-                              letterSpacing: 0.3,
+                              fontSize: 18, // تكبير الفونت
+                              letterSpacing: 0.5,
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 10),
                           // badge السعر
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
+                              horizontal: 14,
+                              vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(24),
                               color: hasSizes
-                                  ? Colors.orange.withValues(alpha: 0.14)
-                                  : CafeTheme.success.withValues(alpha: 0.12),
+                                  ? Colors.orange.withValues(alpha: 0.15)
+                                  : CafeTheme.success.withValues(alpha: 0.15),
                               border: Border.all(
                                 color: hasSizes
-                                    ? Colors.orange.withValues(alpha: 0.40)
-                                    : CafeTheme.success.withValues(alpha: 0.35),
-                                width: 0.8,
+                                    ? Colors.orange.withValues(alpha: 0.45)
+                                    : CafeTheme.success.withValues(alpha: 0.45),
+                                width: 1.0,
                               ),
                             ),
                             child: Row(
@@ -2473,20 +2586,20 @@ class _NeonProductCardState extends State<_NeonProductCard>
                                   hasSizes
                                       ? Icons.tune_rounded
                                       : Icons.payments_outlined,
-                                  size: 11,
+                                  size: 13,
                                   color: hasSizes
                                       ? Colors.orangeAccent
                                       : CafeTheme.success,
                                 ),
-                                const SizedBox(width: 4),
+                                const SizedBox(width: 6),
                                 Text(
                                   priceText,
                                   style: TextStyle(
                                     color: hasSizes
                                         ? Colors.orangeAccent
                                         : CafeTheme.success,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 14,
                                   ),
                                 ),
                               ],
@@ -2499,8 +2612,8 @@ class _NeonProductCardState extends State<_NeonProductCard>
                   // زر الإضافة / التحكم
                   Padding(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 16,
+                      horizontal: 20,
+                      vertical: 20,
                     ),
                     child: inBasket
                         ? _QuantityControl(
@@ -2515,10 +2628,10 @@ class _NeonProductCardState extends State<_NeonProductCard>
                             },
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 200),
-                              width: 44,
-                              height: 44,
+                              width: 50,
+                              height: 50,
                               decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(16),
                                 gradient: const LinearGradient(
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
@@ -2531,17 +2644,17 @@ class _NeonProductCardState extends State<_NeonProductCard>
                                 boxShadow: [
                                   BoxShadow(
                                     color: CafeTheme.primaryBrown.withValues(
-                                      alpha: _isHovered ? 0.80 : 0.55,
+                                      alpha: _isHovered ? 0.85 : 0.60,
                                     ),
-                                    blurRadius: _isHovered ? 18 : 12,
-                                    offset: const Offset(0, 4),
+                                    blurRadius: _isHovered ? 22 : 15,
+                                    offset: const Offset(0, 5),
                                   ),
                                 ],
                               ),
                               child: const Icon(
                                 Icons.add_rounded,
                                 color: Colors.white,
-                                size: 24,
+                                size: 28,
                               ),
                             ),
                           ),
@@ -2555,33 +2668,35 @@ class _NeonProductCardState extends State<_NeonProductCard>
         // badge "في السلة"
         if (inBasket)
           Positioned(
-            top: -6,
-            right: 14,
+            top: -8,
+            right: 20,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(24),
                 gradient: const LinearGradient(
                   colors: [CafeTheme.success, Color(0xFF4CAF50)],
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: CafeTheme.success.withValues(alpha: 0.55),
-                    blurRadius: 8,
+                    color: CafeTheme.success.withValues(alpha: 0.6),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.check_rounded, size: 10, color: Colors.black),
-                  SizedBox(width: 3),
+                  Icon(Icons.check_rounded, size: 12, color: Colors.black),
+                  SizedBox(width: 5),
                   Text(
                     'في السلة',
                     style: TextStyle(
                       color: Colors.black,
-                      fontSize: 10,
+                      fontSize: 12,
                       fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
                     ),
                   ),
                 ],
@@ -2595,7 +2710,7 @@ class _NeonProductCardState extends State<_NeonProductCard>
             left: 0,
             right: 0,
             top: 0,
-            bottom: 14,
+            bottom: 20,
             child: IgnorePointer(
               child: AnimatedBuilder(
                 animation: _burstCtrl,
@@ -2616,40 +2731,40 @@ class _NeonProductCardState extends State<_NeonProductCard>
     final String? imageUrl = item['image_url'];
     if (imageUrl != null && imageUrl.isNotEmpty) {
       return Container(
-        width: 70,
-        height: 70,
+        width: 95,
+        height: 95, // تكبير الصورة
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: CafeTheme.primaryBrown.withValues(alpha: 0.22),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
+              color: CafeTheme.primaryBrown.withValues(alpha: 0.25),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           child: Image.network(
             imageUrl,
-            width: 70,
-            height: 70,
+            width: 95,
+            height: 95,
             fit: BoxFit.cover,
-            cacheWidth: 140,
-            cacheHeight: 140,
+            cacheWidth: 190, // تحسين الأداء (Caching)
+            cacheHeight: 190,
             loadingBuilder: (context, child, loadingProgress) {
               if (loadingProgress == null) return child;
               return Container(
-                width: 70,
-                height: 70,
+                width: 95,
+                height: 95,
                 color: CafeTheme.surface,
                 child: Center(
                   child: SizedBox(
-                    width: 18,
-                    height: 18,
+                    width: 24,
+                    height: 24,
                     child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: CafeTheme.accent.withValues(alpha: 0.5),
+                      strokeWidth: 2.5,
+                      color: CafeTheme.accent.withValues(alpha: 0.6),
                     ),
                   ),
                 ),
@@ -2665,27 +2780,27 @@ class _NeonProductCardState extends State<_NeonProductCard>
 
   Widget _fallbackIcon() {
     return Container(
-      width: 70,
-      height: 70,
+      width: 95,
+      height: 95,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            CafeTheme.primaryBrown.withValues(alpha: 0.20),
-            CafeTheme.secondaryBrown.withValues(alpha: 0.10),
+            CafeTheme.primaryBrown.withValues(alpha: 0.25),
+            CafeTheme.secondaryBrown.withValues(alpha: 0.15),
           ],
         ),
         border: Border.all(
-          color: CafeTheme.primaryBrown.withValues(alpha: 0.30),
-          width: 1,
+          color: CafeTheme.primaryBrown.withValues(alpha: 0.40),
+          width: 1.5,
         ),
       ),
       child: const Icon(
         Icons.fastfood_rounded,
         color: CafeTheme.primaryBrown,
-        size: 30,
+        size: 40,
       ),
     );
   }
@@ -2771,11 +2886,11 @@ class _QuantityControl extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(16),
+        color: Colors.white.withValues(alpha: 0.08),
         border: Border.all(
-          color: CafeTheme.success.withValues(alpha: 0.30),
-          width: 1,
+          color: CafeTheme.success.withValues(alpha: 0.40),
+          width: 1.5,
         ),
       ),
       child: Row(
@@ -2783,13 +2898,13 @@ class _QuantityControl extends StatelessWidget {
         children: [
           _btn(Icons.remove_rounded, Colors.redAccent, onMinus),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
             child: Text(
               '$qty',
               style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.w900,
-                fontSize: 16,
+                fontSize: 18,
               ),
             ),
           ),
@@ -2803,13 +2918,13 @@ class _QuantityControl extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 34,
-        height: 34,
+        width: 38,
+        height: 38,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          color: color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(12),
+          color: color.withValues(alpha: 0.18),
         ),
-        child: Icon(icon, color: color, size: 17),
+        child: Icon(icon, color: color, size: 20),
       ),
     );
   }
@@ -2892,16 +3007,19 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
             return AlertDialog(
               backgroundColor: const Color(0xFF2E1F10),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(24),
                 side: BorderSide(
-                  color: CafeTheme.secondaryBrown.withValues(alpha: 0.6),
-                  width: 1,
+                  color: CafeTheme.secondaryBrown.withValues(alpha: 0.7),
+                  width: 1.5,
                 ),
               ),
               title: Text(
                 "إضافة ${item['name']}",
                 textAlign: TextAlign.right,
-                style: const TextStyle(color: CafeTheme.secondaryBrown),
+                style: const TextStyle(
+                  color: CafeTheme.secondaryBrown,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -2916,10 +3034,10 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                      spacing: 10,
+                      runSpacing: 10,
                       alignment: WrapAlignment.end,
                       children: sizes.map((s) {
                         bool isSelected = selectedSize == s;
@@ -2927,7 +3045,7 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                           label: Text("${s['name']} - ${s['price']} ج.م"),
                           selected: isSelected,
                           selectedColor: CafeTheme.secondaryBrown,
-                          backgroundColor: Colors.white.withValues(alpha: 0.05),
+                          backgroundColor: Colors.white.withValues(alpha: 0.08),
                           labelStyle: TextStyle(
                             color: isSelected ? Colors.black : Colors.white,
                             fontWeight: FontWeight.bold,
@@ -2943,26 +3061,31 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                         );
                       }).toList(),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
                   ],
                   TextField(
                     controller: noteCtrl,
                     textAlign: TextAlign.right,
+                    style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       hintText: "ملاحظات (سكر زيادة، بدون ثلج...)",
                       hintStyle: const TextStyle(
-                        color: Colors.white24,
-                        fontSize: 13,
+                        color: Colors.white38,
+                        fontSize: 14,
                       ),
                       filled: true,
-                      fillColor: Colors.white.withValues(alpha: 0.05),
+                      fillColor: Colors.white.withValues(alpha: 0.08),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(16),
                         borderSide: BorderSide(
                           color: CafeTheme.secondaryBrown.withValues(
-                            alpha: 0.3,
+                            alpha: 0.4,
                           ),
                         ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
                       ),
                     ),
                   ),
@@ -2971,13 +3094,17 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text("إلغاء"),
+                  child: const Text("إلغاء", style: TextStyle(fontSize: 16)),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: CafeTheme.secondaryBrown,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                   onPressed: () {
@@ -3013,7 +3140,8 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                     "إضافة",
                     style: TextStyle(
                       color: Colors.black,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
                     ),
                   ),
                 ),
@@ -3098,12 +3226,13 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
           style: const TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.bold,
+            fontSize: 15,
           ),
         ),
         backgroundColor: color,
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(20),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        margin: const EdgeInsets.all(24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     );
   }
@@ -3112,40 +3241,42 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.all(15),
+          padding: const EdgeInsets.all(20),
           child: Row(
             children: [
               Expanded(
                 child: TextField(
                   controller: tableCtrl,
                   keyboardType: TextInputType.number,
+                  style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     labelText: "رقم الطاولة",
                     labelStyle: const TextStyle(
                       color: CafeTheme.secondaryBrown,
                     ),
                     filled: true,
-                    fillColor: Colors.white.withValues(alpha: 0.05),
+                    fillColor: Colors.white.withValues(alpha: 0.08),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
                       borderSide: BorderSide.none,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 16),
               Expanded(
                 child: TextField(
                   controller: nameCtrl,
+                  style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     labelText: "اسم العميل",
                     labelStyle: const TextStyle(
                       color: CafeTheme.secondaryBrown,
                     ),
                     filled: true,
-                    fillColor: Colors.white.withValues(alpha: 0.05),
+                    fillColor: Colors.white.withValues(alpha: 0.08),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
                       borderSide: BorderSide.none,
                     ),
                   ),
@@ -3155,10 +3286,11 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 15),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: TextField(
             controller: searchCtrl,
             onChanged: (v) => setState(() => searchQuery = v),
+            style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
               hintText: "ابحث عن منتج...",
               hintStyle: const TextStyle(color: Colors.white38),
@@ -3167,17 +3299,17 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                 color: CafeTheme.secondaryBrown,
               ),
               filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.05),
+              fillColor: Colors.white.withValues(alpha: 0.08),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
               ),
             ),
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 16),
         SizedBox(
-          height: 40,
+          height: 45,
           child: StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
                 .collection('categories')
@@ -3194,7 +3326,7 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                 });
               return ListView.builder(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 15),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 itemCount: cats.length + 1,
                 itemBuilder: (c, i) {
                   bool isAll = i == 0;
@@ -3202,24 +3334,32 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                   bool isSelected = selectedCategory == catName;
                   return GestureDetector(
                     onTap: () => setState(() => selectedCategory = catName),
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 5),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.symmetric(horizontal: 6),
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
+                        horizontal: 20,
+                        vertical: 10,
                       ),
                       decoration: BoxDecoration(
                         color: isSelected
                             ? CafeTheme.secondaryBrown
-                            : Colors.white.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(20),
+                            : Colors.white.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: isSelected
+                              ? CafeTheme.secondaryBrown
+                              : Colors.transparent,
+                        ),
                       ),
-                      child: Text(
-                        isAll ? "الكل" : (catName ?? ""),
-                        style: TextStyle(
-                          color: isSelected ? Colors.black : Colors.white70,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                      child: Center(
+                        child: Text(
+                          isAll ? "الكل" : (catName ?? ""),
+                          style: TextStyle(
+                            color: isSelected ? Colors.black : Colors.white70,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                     ),
@@ -3229,7 +3369,7 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
             },
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 16),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
             stream: selectedCategory == null
@@ -3257,12 +3397,12 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
               double childAspectRatio = screenWidth < 600 ? 0.85 : 1.0;
 
               return GridView.builder(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(20),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: crossAxisCount,
                   childAspectRatio: childAspectRatio,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
                 ),
                 itemCount: items.length,
                 itemBuilder: (context, index) {
@@ -3273,27 +3413,28 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            Colors.white.withValues(alpha: 0.10),
-                            Colors.white.withValues(alpha: 0.03),
+                            Colors.white.withValues(alpha: 0.12),
+                            Colors.white.withValues(alpha: 0.05),
                           ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius: BorderRadius.circular(24),
                         border: Border.all(
-                          color: CafeTheme.accent.withValues(alpha: 0.55),
+                          color: CafeTheme.accent.withValues(alpha: 0.6),
                           width: 1.5,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: CafeTheme.accent.withValues(alpha: 0.12),
-                            blurRadius: 12,
+                            color: CafeTheme.accent.withValues(alpha: 0.15),
+                            blurRadius: 15,
                             spreadRadius: 1,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16.5),
+                        borderRadius: BorderRadius.circular(22),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
@@ -3310,28 +3451,28 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                                           const Icon(
                                             Icons.fastfood,
                                             color: CafeTheme.accent,
-                                            size: 40,
+                                            size: 45,
                                           ),
                                     )
                                   : const Icon(
                                       Icons.fastfood,
                                       color: CafeTheme.accent,
-                                      size: 40,
+                                      size: 45,
                                     ),
                             ),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 9,
+                                horizontal: 14,
+                                vertical: 12,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.78),
+                                color: Colors.black.withValues(alpha: 0.85),
                                 border: Border(
                                   top: BorderSide(
                                     color: CafeTheme.accent.withValues(
-                                      alpha: 0.3,
+                                      alpha: 0.4,
                                     ),
-                                    width: 1,
+                                    width: 1.5,
                                   ),
                                 ),
                               ),
@@ -3343,20 +3484,20 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                                   Text(
                                     item['name'] ?? "",
                                     style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 15,
                                       color: Colors.white,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: 6),
                                   Text(
                                     "${item['price']} ج.م",
                                     style: const TextStyle(
                                       color: CafeTheme.accent,
                                       fontWeight: FontWeight.w900,
-                                      fontSize: 13,
+                                      fontSize: 14,
                                     ),
                                   ),
                                 ],
@@ -3398,13 +3539,13 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
           return const Center(
             child: Text(
               "لا توجد طلبات",
-              style: TextStyle(color: Colors.white38, fontSize: 16),
+              style: TextStyle(color: Colors.white54, fontSize: 18),
             ),
           );
         }
 
         return ListView.builder(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(20),
           itemCount: orders.length,
           itemBuilder: (context, index) {
             var data = orders[index].data() as Map<String, dynamic>;
@@ -3413,58 +3554,79 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                 ? Colors.greenAccent
                 : (status == "جاري التجهيز"
                       ? Colors.orangeAccent
-                      : Colors.white38);
+                      : Colors.white54);
             List items = data['items_with_qty'] ?? [];
 
             return Container(
-              margin: const EdgeInsets.symmetric(vertical: 6),
+              margin: const EdgeInsets.symmetric(vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.03),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: sColor.withValues(alpha: 0.4)),
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: sColor.withValues(alpha: 0.5),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: sColor.withValues(alpha: 0.1),
+                    blurRadius: 10,
+                  ),
+                ],
               ),
               child: ExpansionTile(
-                leading: Icon(Icons.receipt_long_rounded, color: sColor),
+                leading: Icon(
+                  Icons.receipt_long_rounded,
+                  color: sColor,
+                  size: 28,
+                ),
                 title: Text(
                   "${data['customer_name']} - طاولة ${data['table_number']}",
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                  ),
                 ),
                 subtitle: Text(
                   status,
                   style: TextStyle(
                     color: sColor,
-                    fontSize: 12,
+                    fontSize: 14,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 children: [
                   Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         ...items.map(
                           (item) => Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 3),
+                            padding: const EdgeInsets.symmetric(vertical: 4),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
                                   item['name'] ?? "",
-                                  style: const TextStyle(fontSize: 13),
+                                  style: const TextStyle(fontSize: 15),
                                 ),
                                 Text(
                                   "x${item['qty']}",
                                   style: const TextStyle(
                                     color: CafeTheme.secondaryBrown,
-                                    fontWeight: FontWeight.bold,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 16,
                                   ),
                                 ),
                               ],
                             ),
                           ),
                         ),
-                        const Divider(color: Colors.white10),
+                        const Divider(
+                          color: Colors.white24,
+                          height: 24,
+                          thickness: 1,
+                        ),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -3472,25 +3634,26 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                               "${data['total_price']} ج.م",
                               style: const TextStyle(
                                 color: CafeTheme.success,
-                                fontWeight: FontWeight.bold,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 18,
                               ),
                             ),
                             Row(
                               children: [
                                 _statusButton(
                                   "قيد الانتظار",
-                                  Colors.white38,
+                                  Colors.white54,
                                   status,
                                   orders[index].id,
                                 ),
-                                const SizedBox(width: 5),
+                                const SizedBox(width: 8),
                                 _statusButton(
                                   "جاري التجهيز",
                                   Colors.orangeAccent,
                                   status,
                                   orders[index].id,
                                 ),
-                                const SizedBox(width: 5),
+                                const SizedBox(width: 8),
                                 _statusButton(
                                   "جاهز",
                                   Colors.greenAccent,
@@ -3530,21 +3693,24 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
           }
         },
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
             color: isSelected
-                ? color.withValues(alpha: 0.2)
-                : Colors.white.withValues(alpha: 0.03),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: isSelected ? color : Colors.white10),
+                ? color.withValues(alpha: 0.25)
+                : Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? color : Colors.white24,
+              width: 1.5,
+            ),
           ),
           child: Text(
             label,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: isSelected ? color : Colors.white38,
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
+              color: isSelected ? color : Colors.white54,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
             ),
           ),
         ),
@@ -3564,15 +3730,19 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
             "لوحة الويتر 🤵",
             style: TextStyle(
               color: CafeTheme.secondaryBrown,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w900,
+              fontSize: 20,
             ),
           ),
+          elevation: 5,
+          shadowColor: CafeTheme.primaryBrown.withValues(alpha: 0.3),
         ),
         bottomNavigationBar: BottomNavigationBar(
           backgroundColor: CafeTheme.surface,
           selectedItemColor: CafeTheme.primaryBrown,
           unselectedItemColor: Colors.white54,
           currentIndex: _currentTabIndex,
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
           onTap: (index) => setState(() => _currentTabIndex = index),
           items: const [
             BottomNavigationBarItem(
@@ -3594,18 +3764,18 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
 
   Widget _buildBasketSummary() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: CafeTheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
         border: const Border(
-          top: BorderSide(color: CafeTheme.primaryBrown, width: 1),
+          top: BorderSide(color: CafeTheme.primaryBrown, width: 1.5),
         ),
         boxShadow: [
           BoxShadow(
-            color: CafeTheme.primaryBrown.withValues(alpha: 0.2),
-            blurRadius: 15,
-            offset: const Offset(0, -3),
+            color: CafeTheme.primaryBrown.withValues(alpha: 0.3),
+            blurRadius: 20,
+            offset: const Offset(0, -5),
           ),
         ],
       ),
@@ -3613,21 +3783,22 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
         mainAxisSize: MainAxisSize.min,
         children: [
           ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 200),
+            constraints: const BoxConstraints(maxHeight: 250),
             child: ListView.builder(
               shrinkWrap: true,
+              physics: const BouncingScrollPhysics(),
               itemCount: waiterBasket.length,
               itemBuilder: (context, index) {
                 var item = waiterBasket[index];
                 return Container(
-                  margin: const EdgeInsets.symmetric(vertical: 5),
+                  margin: const EdgeInsets.symmetric(vertical: 6),
                   padding: const EdgeInsets.symmetric(
-                    vertical: 5,
-                    horizontal: 10,
+                    vertical: 10,
+                    horizontal: 16,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(10),
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -3638,8 +3809,8 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                             child: Text(
                               item['name'],
                               style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
                               ),
                             ),
                           ),
@@ -3647,7 +3818,7 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                             icon: const Icon(
                               Icons.remove_circle_outline,
                               color: Colors.redAccent,
-                              size: 20,
+                              size: 24,
                             ),
                             onPressed: () => setState(() {
                               if (item['qty'] > 1) {
@@ -3659,39 +3830,30 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                           ),
                           Text(
                             "${item['qty']}",
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 18,
+                            ),
                           ),
                           IconButton(
                             icon: const Icon(
                               Icons.add_circle_outline,
                               color: Colors.greenAccent,
-                              size: 20,
+                              size: 24,
                             ),
-                            onPressed: () => setState(() => item['qty']++),
-                          ),
-                          SizedBox(
-                            width: 70,
-                            child: Text(
-                              "${(item['qty'] as num) * (item['price'] as num)} ج.م",
-                              textAlign: TextAlign.end,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: CafeTheme.accent,
-                              ),
-                            ),
+                            onPressed: () => setState(() {
+                              item['qty']++;
+                            }),
                           ),
                         ],
                       ),
-                      if (item['note'] != null &&
-                          item['note'] != "بدون ملاحظات")
-                        Padding(
-                          padding: const EdgeInsets.only(right: 5, bottom: 5),
-                          child: Text(
-                            "📝 ${item['note']}",
-                            style: const TextStyle(
-                              color: Colors.grey,
-                              fontSize: 10,
-                            ),
+                      if (item['note'] != "بدون ملاحظات")
+                        Text(
+                          "📝 ${item['note']}",
+                          style: const TextStyle(
+                            color: Colors.orangeAccent,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                     ],
@@ -3700,29 +3862,26 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
               },
             ),
           ),
-          const Divider(height: 25),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: CafeTheme.secondaryBrown,
-                  padding: const EdgeInsets.symmetric(vertical: 20),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  shadowColor: CafeTheme.secondaryBrown.withValues(alpha: 0.6),
-                  elevation: 8,
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            height: 55,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: CafeTheme.secondaryBrown,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                onPressed: _sendToBarista,
-                child: const Text(
-                  "إرسال للباريستا 🚀",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    fontSize: 16,
-                  ),
+                elevation: 5,
+                shadowColor: CafeTheme.secondaryBrown.withValues(alpha: 0.5),
+              ),
+              onPressed: _sendToBarista,
+              child: const Text(
+                "إرسال الطلب للباريستا",
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 18,
                 ),
               ),
             ),
