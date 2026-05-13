@@ -2228,7 +2228,8 @@ class _CinematicCategoryCarouselState extends State<CinematicCategoryCarousel> {
   }
 }
 
-class _CategoryCard extends StatefulWidget {
+// ✅ StatelessWidget — بدون hover state (كان بيسبب setState لكل كارت في الكاروسيل)
+class _CategoryCard extends StatelessWidget {
   final String name;
   final IconData icon;
   final bool isSelected;
@@ -2249,99 +2250,69 @@ class _CategoryCard extends StatefulWidget {
     required this.onTap,
   });
 
-  @override
-  State<_CategoryCard> createState() => _CategoryCardState();
-}
-
-class _CategoryCardState extends State<_CategoryCard> {
-  bool _isHovered = false;
+  static const _selectedGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xF57A4D2A), Color(0xE6A0622A), Color(0xE05F3814)],
+  );
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOutCubic,
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-          transform: Matrix4.translationValues(0, _isHovered ? -5 : 0, 0),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(32), // زوايا دائرية أكثر
-            color: widget.isSelected
-                ? null
-                : Colors.black.withValues(alpha: 0.3), // شفافية خفيفة
-            gradient: widget.isSelected
-                ? LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      const Color(0xFF7A4D2A).withValues(alpha: 0.96),
-                      CafeTheme.primaryBrown.withValues(alpha: 0.90),
-                      const Color(0xFF5F3814).withValues(alpha: 0.88),
-                    ],
-                  )
-                : null,
-            border: Border.all(
-              color: widget.isSelected
-                  ? CafeTheme.secondaryBrown.withValues(alpha: 0.7)
-                  : CafeTheme.primaryBrown.withValues(
-                      alpha: _isHovered ? 0.4 : 0.2,
-                    ),
-              width: widget.isSelected ? 2.0 : 1.2,
-            ),
-            boxShadow: widget.isSelected
-                ? [
-                    BoxShadow(
-                      color: const Color(0xFFC49A6D).withValues(alpha: 0.35),
-                      blurRadius: 45,
-                      spreadRadius: 2,
-                    ),
-                    BoxShadow(
-                      color: CafeTheme.primaryBrown.withValues(alpha: 0.3),
-                      blurRadius: 30,
-                      spreadRadius: 1,
-                    ),
-                  ]
-                : [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.2),
-                      blurRadius: 12,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(32),
+          color: isSelected ? null : Colors.black.withValues(alpha: 0.3),
+          gradient: isSelected ? _selectedGradient : null,
+          border: Border.all(
+            color: isSelected
+                ? CafeTheme.secondaryBrown.withValues(alpha: 0.7)
+                : CafeTheme.primaryBrown.withValues(alpha: 0.2),
+            width: isSelected ? 2.0 : 1.2,
           ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  widget.icon,
-                  size: widget.active ? widget.iconSize : widget.iconSize - 8,
-                  color: widget.isSelected
-                      ? const Color(0xFFF5E6D3)
-                      : CafeTheme.primaryBrown.withValues(alpha: 0.8),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  widget.name,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.0,
-                    fontSize: widget.active
-                        ? widget.fontSizeActive
-                        : widget.fontSizeInactive,
-                    color: widget.isSelected ? Colors.white : Colors.white70,
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFFC49A6D).withValues(alpha: 0.35),
+                    blurRadius: 45,
+                    spreadRadius: 2,
                   ),
+                  BoxShadow(
+                    color: CafeTheme.primaryBrown.withValues(alpha: 0.3),
+                    blurRadius: 30,
+                    spreadRadius: 1,
+                  ),
+                ]
+              : null,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: active ? iconSize : iconSize - 8,
+                color: isSelected
+                    ? const Color(0xFFF5E6D3)
+                    : CafeTheme.primaryBrown.withValues(alpha: 0.8),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                name,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.0,
+                  fontSize: active ? fontSizeActive : fontSizeInactive,
+                  color: isSelected ? Colors.white : Colors.white70,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -2561,9 +2532,12 @@ class UFOBeamProductSection extends StatelessWidget {
 }
 
 // ==========================================
-// كارت المنتج - Premium مع particle burst
+// كارت المنتج - StatelessWidget خفيف، نفس الـ UI بدون AnimationController لكل كارت
+// ✅ الـ hover effect اتشال من كل كارت (كان بيسبب setState لكل list item)
+// ✅ الـ particle burst اتشال (كان بيعمل AnimationController لكل منتج في الـ list)
+// ✅ الـ gradient ثابت (مش بيتحسب في runtime على كل frame)
 // ==========================================
-class _NeonProductCard extends StatefulWidget {
+class _NeonProductCard extends StatelessWidget {
   final Map<String, dynamic> item;
   final bool inBasket;
   final int qty;
@@ -2581,164 +2555,79 @@ class _NeonProductCard extends StatefulWidget {
     required this.onPlus,
   });
 
-  @override
-  State<_NeonProductCard> createState() => _NeonProductCardState();
-}
-
-class _NeonProductCardState extends State<_NeonProductCard>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _burstCtrl;
-  bool _showBurst = false;
-  bool _isHovered = false;
-
-  final List<_Particle> _particles = [];
-  final math.Random _rng = math.Random();
-
-  @override
-  void initState() {
-    super.initState();
-    _burstCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
-    );
-    _burstCtrl.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        if (mounted) setState(() => _showBurst = false);
-        _burstCtrl.reset();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _burstCtrl.dispose();
-    super.dispose();
-  }
-
-  void _triggerBurst() {
-    _particles.clear();
-    for (int i = 0; i < 20; i++) {
-      final double angle = (i / 20) * math.pi * 2 + _rng.nextDouble() * 0.4;
-      final double speed = 45 + _rng.nextDouble() * 60;
-      final double size = 4 + _rng.nextDouble() * 5;
-      final Color color = [
-        CafeTheme.primaryBrown,
-        CafeTheme.secondaryBrown,
-        CafeTheme.success,
-        Colors.white,
-        const Color(0xFFD4A96A),
-      ][i % 5];
-      _particles.add(
-        _Particle(angle: angle, speed: speed, size: size, color: color),
-      );
-    }
-    setState(() => _showBurst = true);
-    _burstCtrl.forward();
-  }
+  // ✅ ثوابت static — لا تُعاد في كل build
+  static const _gradientNormal = LinearGradient(
+    begin: Alignment.centerRight,
+    end: Alignment.centerLeft,
+    colors: [Color(0xB31A0F05), Color(0xB32E1F10), Color(0xCC0D0804)],
+  );
+  static const _gradientInBasket = LinearGradient(
+    begin: Alignment.centerRight,
+    end: Alignment.centerLeft,
+    colors: [Color(0xCC1A2A10), Color(0xCC0D1A05), Color(0xE60D0804)],
+  );
+  static const _barGradientNormal = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [CafeTheme.primaryBrown, Color(0xFF7A4D2A)],
+  );
+  static const _barGradientInBasket = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [CafeTheme.success, Color(0xFF4CAF50)],
+  );
 
   @override
   Widget build(BuildContext context) {
-    final String name = widget.item['name'] ?? '';
+    final String name = item['name'] ?? '';
     final bool hasSizes =
-        widget.item['sizes'] != null &&
-        (widget.item['sizes'] as List).isNotEmpty;
-    final String priceText = hasSizes
-        ? 'أحجام متعددة'
-        : '${widget.item['price']} ج.م';
-    final bool inBasket = widget.inBasket;
+        item['sizes'] != null && (item['sizes'] as List).isNotEmpty;
+    final String priceText =
+        hasSizes ? 'أحجام متعددة' : '${item['price']} ج.م';
     final Color accent = inBasket ? CafeTheme.success : CafeTheme.primaryBrown;
-    final Color accentDim = inBasket
-        ? const Color(0xFF4CAF50)
-        : const Color(0xFF7A4D2A);
 
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        MouseRegion(
-          onEnter: (_) => setState(() => _isHovered = true),
-          onExit: (_) => setState(() => _isHovered = false),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOutCubic,
-            margin: const EdgeInsets.only(bottom: 20),
-            transform: Matrix4.translationValues(
-              0,
-              _isHovered && !inBasket ? -4 : 0,
-              0,
+        // ✅ Container ثابت بدون AnimatedContainer أو MouseRegion
+        Container(
+          margin: const EdgeInsets.only(bottom: 20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            gradient: inBasket ? _gradientInBasket : _gradientNormal,
+            border: Border.all(
+              color: accent.withValues(alpha: inBasket ? 0.80 : 0.25),
+              width: inBasket ? 2.0 : 1.2,
             ),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(
-                28,
-              ), // تكبير الـ Border Radius
-              color: Colors.black.withValues(
-                alpha: 0.4,
-              ), // شفافية إضافية للخلفية
-              gradient: LinearGradient(
-                begin: Alignment.centerRight,
-                end: Alignment.centerLeft,
-                colors: inBasket
-                    ? [
-                        const Color(0xFF1A2A10).withValues(alpha: 0.8),
-                        const Color(0xFF0D1A05).withValues(alpha: 0.8),
-                        const Color(0xFF0D0804).withValues(alpha: 0.9),
-                      ]
-                    : _isHovered
-                    ? [
-                        const Color(0xFF251505).withValues(alpha: 0.8),
-                        const Color(0xFF3A2815).withValues(alpha: 0.8),
-                        const Color(0xFF120A02).withValues(alpha: 0.9),
-                      ]
-                    : [
-                        const Color(0xFF1A0F05).withValues(alpha: 0.7),
-                        const Color(0xFF2E1F10).withValues(alpha: 0.7),
-                        const Color(0xFF0D0804).withValues(alpha: 0.8),
-                      ],
-              ),
-              border: Border.all(
-                color: accent.withValues(
-                  alpha: inBasket ? 0.80 : (_isHovered ? 0.50 : 0.25),
-                ),
-                width: inBasket ? 2.0 : (_isHovered ? 1.5 : 1.2),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: accent.withValues(
-                    alpha: inBasket ? 0.35 : (_isHovered ? 0.20 : 0.05),
-                  ),
-                  blurRadius: inBasket ? 25 : (_isHovered ? 18 : 10),
-                  spreadRadius: inBasket ? 2 : 0,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(28),
-              child: Row(
-                children: [
-                  // شريط لوني جانبي
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    width: 6,
-                    height: 120, // تكبير الارتفاع
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [accent, accentDim],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: accent.withValues(alpha: 0.8),
-                          blurRadius: 10,
-                          spreadRadius: 2,
-                        ),
-                      ],
+            // ✅ shadow فقط لما يكون في السلة (مش على كل كارت)
+            boxShadow: inBasket
+                ? [
+                    BoxShadow(
+                      color: CafeTheme.success.withValues(alpha: 0.30),
+                      blurRadius: 20,
+                      spreadRadius: 1,
+                      offset: const Offset(0, 4),
                     ),
+                  ]
+                : null,
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(28),
+            child: Row(
+              children: [
+                // ✅ شريط لوني جانبي — ثابت بدون AnimatedContainer
+                Container(
+                  width: 6,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    gradient:
+                        inBasket ? _barGradientInBasket : _barGradientNormal,
                   ),
-                  const SizedBox(width: 18),
-                  // الصورة - بحجم أكبر
-                  _buildItemImage(widget.item),
-                  const SizedBox(width: 20),
+                ),
+                const SizedBox(width: 18),
+                // الصورة
+                _buildItemImage(item),
+                const SizedBox(width: 20),
                   // الاسم والسعر
                   Expanded(
                     child: Padding(
@@ -2817,17 +2706,13 @@ class _NeonProductCardState extends State<_NeonProductCard>
                     ),
                     child: inBasket
                         ? _QuantityControl(
-                            qty: widget.qty,
-                            onMinus: widget.onMinus!,
-                            onPlus: widget.onPlus!,
+                            qty: qty,
+                            onMinus: onMinus!,
+                            onPlus: onPlus!,
                           )
                         : GestureDetector(
-                            onTap: () {
-                              widget.onAdd();
-                              _triggerBurst();
-                            },
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
+                            onTap: onAdd,
+                            child: Container(
                               width: 50,
                               height: 50,
                               decoration: BoxDecoration(
@@ -2844,10 +2729,10 @@ class _NeonProductCardState extends State<_NeonProductCard>
                                 boxShadow: [
                                   BoxShadow(
                                     color: CafeTheme.primaryBrown.withValues(
-                                      alpha: _isHovered ? 0.85 : 0.60,
+                                      alpha: 0.55,
                                     ),
-                                    blurRadius: _isHovered ? 22 : 15,
-                                    offset: const Offset(0, 5),
+                                    blurRadius: 14,
+                                    offset: const Offset(0, 4),
                                   ),
                                 ],
                               ),
@@ -2863,7 +2748,6 @@ class _NeonProductCardState extends State<_NeonProductCard>
               ),
             ),
           ),
-        ),
 
         // badge "في السلة"
         if (inBasket)
@@ -2903,31 +2787,12 @@ class _NeonProductCardState extends State<_NeonProductCard>
               ),
             ),
           ),
-
-        // طبقة الجزيئات
-        if (_showBurst)
-          Positioned(
-            left: 0,
-            right: 0,
-            top: 0,
-            bottom: 20,
-            child: IgnorePointer(
-              child: AnimatedBuilder(
-                animation: _burstCtrl,
-                builder: (context, _) => CustomPaint(
-                  painter: _ParticleBurstPainter(
-                    particles: _particles,
-                    progress: _burstCtrl.value,
-                  ),
-                ),
-              ),
-            ),
-          ),
       ],
     );
   }
 
-  Widget _buildItemImage(Map<String, dynamic> item) {
+  // ✅ static method — لا تحتاج instance
+  static Widget _buildItemImage(Map<String, dynamic> item) {
     final String? imageUrl = item['image_url'];
     if (imageUrl != null && imageUrl.isNotEmpty) {
       return Container(
@@ -2976,7 +2841,7 @@ class _NeonProductCardState extends State<_NeonProductCard>
     return _fallbackIcon();
   }
 
-  Widget _fallbackIcon() {
+  static Widget _fallbackIcon() {
     return Container(
       width: 95,
       height: 95,
@@ -3004,7 +2869,8 @@ class _NeonProductCardState extends State<_NeonProductCard>
   }
 }
 
-// بيانات جسيمة واحدة
+// _Particle و _ParticleBurstPainter محتفظ بيهم للـ WaiterTerminal لو محتاجهم
+// لكن _NeonProductCard مش بيستخدمهم تاني
 class _Particle {
   final double angle;
   final double speed;
