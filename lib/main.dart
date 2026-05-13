@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:async';
 import 'dart:ui';
 import 'dart:math' as math;
 import 'dart:js' as js;
@@ -115,6 +117,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   late AnimationController _glowController;
   late AnimationController _fabPulseController;
 
+  // ✅ Debounce لتقليل rebuilds عند البحث
+  Timer? _searchDebounce;
+
   final TextEditingController _noteController = TextEditingController();
   final TextEditingController _nameEntryController = TextEditingController();
   final TextEditingController _tableEntryController = TextEditingController();
@@ -137,6 +142,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _glowController.dispose();
     _fabPulseController.dispose();
     _catSearchCtrl.dispose();
@@ -735,6 +741,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       children: [
         const _MenuBackground(),
         CustomScrollView(
+          // ✅ PageStorageKey يحافظ على scroll position
+          key: const PageStorageKey<String>('main_scroll'),
           physics: const BouncingScrollPhysics(
             parent: AlwaysScrollableScrollPhysics(),
           ),
@@ -742,7 +750,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             _buildCinematicHeader(),
             _buildSearchBar(),
             _buildCategoryCarouselSection(),
-            SliverToBoxAdapter(child: _buildProductListSection()),
+            // ✅ المنتجات مباشرة كـ Sliver — بدون SliverToBoxAdapter
+            _buildProductSliverSection(),
             const SliverToBoxAdapter(child: SizedBox(height: 350)),
           ],
         ),
@@ -953,7 +962,13 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           ),
           child: TextField(
             controller: _globalSearchCtrl,
-            onChanged: (_) => setState(() {}),
+            // ✅ Debounce 350ms — يمنع rebuild عند كل ضغطة حرف
+            onChanged: (_) {
+              _searchDebounce?.cancel();
+              _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+                if (mounted) setState(() {});
+              });
+            },
             style: const TextStyle(color: CafeTheme.textMain, fontSize: 16),
             decoration: InputDecoration(
               hintText: "ابحث عن منتج أو قسم...",
@@ -1108,9 +1123,34 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     );
   }
 
+  // ✅ يُرجع Sliver مباشرة — لا SliverToBoxAdapter، لا shrinkWrap
+  Widget _buildProductSliverSection() {
+    if (currentCat == null) return const SliverToBoxAdapter(child: SizedBox());
+
+    return _ProductStreamSliver(
+      category: currentCat!,
+      searchQuery: _globalSearchCtrl.text.trim(),
+      basket: basket,
+      onAddItem: _showAddDialog,
+      onQuantityChange: (idx, increase) {
+        setState(() {
+          if (increase) {
+            basket[idx]['quantity']++;
+          } else {
+            if (basket[idx]['quantity'] > 1) {
+              basket[idx]['quantity']--;
+            } else {
+              basket.removeAt(idx);
+            }
+          }
+        });
+      },
+    );
+  }
+
+  // الدالة القديمة نبقيها للتوافق الداخلي (غير مستخدمة في CustomScrollView الجديد)
   Widget _buildProductListSection() {
     if (currentCat == null) return const SizedBox();
-
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('products')
@@ -1118,7 +1158,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError || !snapshot.hasData) return const SizedBox();
-
         var items = snapshot.data!.docs;
         String q = _globalSearchCtrl.text.trim();
         if (q.isNotEmpty) {
@@ -1127,7 +1166,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             return name.contains(q);
           }).toList();
         }
-
         if (items.isEmpty) {
           return const Padding(
             padding: EdgeInsets.all(50),
@@ -1139,7 +1177,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             ),
           );
         }
-
         return UFOBeamProductSection(
           items: items.map((d) => d.data() as Map<String, dynamic>).toList(),
           categoryName: currentCat ?? '',
@@ -1374,6 +1411,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         return SizedBox(
           height: 125,
           child: ListView.builder(
+            // ✅ يحافظ على scroll position بين الـ rebuilds
+            key: const PageStorageKey<String>('active_orders'),
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -1449,6 +1488,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     return SizedBox(
       height: 140,
       child: ListView.builder(
+        // ✅ PageStorageKey يحافظ على scroll position للسلة
+        key: const PageStorageKey<String>('basket_row'),
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.only(top: 14, left: 24, right: 24),
@@ -2311,6 +2352,161 @@ class _CategoryCardState extends State<_CategoryCard> {
 // ==========================================
 // NEON PRODUCT SECTION — خفيف وسريع
 // ==========================================
+// ==========================================
+// _ProductStreamSliver — يعزل Stream عن باقي الـ widget tree
+// الـ StreamBuilder هنا مش بيعمل rebuild للـ Header أو الـ SearchBar
+// ==========================================
+class _ProductStreamSliver extends StatefulWidget {
+  final String category;
+  final String searchQuery;
+  final List<Map<String, dynamic>> basket;
+  final Function(Map<String, dynamic>) onAddItem;
+  final Function(int idx, bool increase) onQuantityChange;
+
+  const _ProductStreamSliver({
+    required this.category,
+    required this.searchQuery,
+    required this.basket,
+    required this.onAddItem,
+    required this.onQuantityChange,
+  });
+
+  @override
+  State<_ProductStreamSliver> createState() => _ProductStreamSliverState();
+}
+
+class _ProductStreamSliverState extends State<_ProductStreamSliver>
+    with AutomaticKeepAliveClientMixin {
+  // ✅ Pagination — يجلب أول 20 منتج ويوسّع عند الحاجة
+  static const int _pageSize = 20;
+  int _loadedCount = _pageSize;
+  List<Map<String, dynamic>> _allItems = [];
+  bool _hasMore = false;
+
+  @override
+  bool get wantKeepAlive => true; // ✅ يحافظ على الحالة عند tab switch
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('products')
+          .where('cat', isEqualTo: widget.category)
+          .limit(_loadedCount) // ✅ Pagination: limit الـ query
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError || !snapshot.hasData) {
+          return const SliverToBoxAdapter(child: SizedBox());
+        }
+
+        var docs = snapshot.data!.docs;
+        _hasMore = docs.length == _loadedCount;
+
+        var items = docs;
+        if (widget.searchQuery.isNotEmpty) {
+          items = docs.where((doc) {
+            final name = (doc['name'] ?? '').toString();
+            return name.contains(widget.searchQuery);
+          }).toList();
+        }
+
+        if (items.isEmpty) {
+          return const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.all(50),
+              child: Center(
+                child: Text(
+                  'لا توجد منتجات في هذا القسم',
+                  style: TextStyle(color: Colors.white54, fontSize: 16),
+                ),
+              ),
+            ),
+          );
+        }
+
+        _allItems =
+            items.map((d) => d.data() as Map<String, dynamic>).toList();
+
+        // ✅ O(1) basket lookup — مرة واحدة قبل SliverList
+        final Map<String, int> basketIndexMap = {
+          for (int i = 0; i < widget.basket.length; i++)
+            widget.basket[i]['name'] as String: i,
+        };
+
+        return SliverMainAxisGroup(
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, i) {
+                    final item = _allItems[i];
+                    final String name = item['name'] ?? '';
+                    final int? bIdx = basketIndexMap[name];
+                    final bool inBasket = bIdx != null;
+                    return RepaintBoundary(
+                      child: _NeonProductCard(
+                        key: ValueKey('${widget.category}_$name'),
+                        item: item,
+                        inBasket: inBasket,
+                        qty: inBasket
+                            ? (widget.basket[bIdx!]['quantity'] as int)
+                            : 0,
+                        onAdd: () => widget.onAddItem(item),
+                        onMinus: inBasket
+                            ? () => widget.onQuantityChange(bIdx!, false)
+                            : null,
+                        onPlus: inBasket
+                            ? () => widget.onQuantityChange(bIdx!, true)
+                            : null,
+                      ),
+                    );
+                  },
+                  childCount: _allItems.length,
+                ),
+              ),
+            ),
+            // ✅ زر "تحميل المزيد" عند وجود منتجات إضافية
+            if (_hasMore && widget.searchQuery.isEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 40, vertical: 8),
+                  child: OutlinedButton.icon(
+                    onPressed: () =>
+                        setState(() => _loadedCount += _pageSize),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: CafeTheme.primaryBrown),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    icon: const Icon(
+                      Icons.expand_more_rounded,
+                      color: CafeTheme.primaryBrown,
+                    ),
+                    label: const Text(
+                      'تحميل المزيد',
+                      style: TextStyle(
+                        color: CafeTheme.primaryBrown,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+// ==========================================
+// UFOBeamProductSection — Sliver-based, no shrinkWrap, O(1) basket lookup
+// ==========================================
 class UFOBeamProductSection extends StatelessWidget {
   final List<Map<String, dynamic>> items;
   final String categoryName;
@@ -2330,31 +2526,35 @@ class UFOBeamProductSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (items.isEmpty) return const SizedBox();
-    return Padding(
+
+    // ✅ O(1) basket lookup — built once, never inside itemBuilder
+    final Map<String, int> basketIndexMap = {
+      for (int i = 0; i < basket.length; i++) basket[i]['name'] as String: i,
+    };
+
+    return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      child: ListView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: items.length,
-        itemBuilder: (context, i) {
-          final item = items[i];
-          final String name = item['name'] ?? '';
-          final int basketIdx = basket.indexWhere((e) => e['name'] == name);
-          final bool inBasket = basketIdx != -1;
-          return RepaintBoundary(
-            child: _NeonProductCard(
-              key: ValueKey('${categoryName}_$name'),
-              item: item,
-              inBasket: inBasket,
-              qty: inBasket ? (basket[basketIdx]['quantity'] as int) : 0,
-              onAdd: () => onAddItem(item),
-              onMinus: inBasket
-                  ? () => onQuantityChange(basketIdx, false)
-                  : null,
-              onPlus: inBasket ? () => onQuantityChange(basketIdx, true) : null,
-            ),
-          );
-        },
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, i) {
+            final item = items[i];
+            final String name = item['name'] ?? '';
+            final int? bIdx = basketIndexMap[name];
+            final bool inBasket = bIdx != null;
+            return RepaintBoundary(
+              child: _NeonProductCard(
+                key: ValueKey('${categoryName}_$name'),
+                item: item,
+                inBasket: inBasket,
+                qty: inBasket ? (basket[bIdx!]['quantity'] as int) : 0,
+                onAdd: () => onAddItem(item),
+                onMinus: inBasket ? () => onQuantityChange(bIdx!, false) : null,
+                onPlus: inBasket ? () => onQuantityChange(bIdx!, true) : null,
+              ),
+            );
+          },
+          childCount: items.length,
+        ),
       ),
     );
   }
@@ -2732,7 +2932,7 @@ class _NeonProductCardState extends State<_NeonProductCard>
     if (imageUrl != null && imageUrl.isNotEmpty) {
       return Container(
         width: 95,
-        height: 95, // تكبير الصورة
+        height: 95,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
@@ -2745,32 +2945,30 @@ class _NeonProductCardState extends State<_NeonProductCard>
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(20),
-          child: Image.network(
-            imageUrl,
+          // ✅ CachedNetworkImage — تخزين مؤقت على القرص، لا يعيد التحميل عند rebuild
+          child: CachedNetworkImage(
+            imageUrl: imageUrl,
             width: 95,
             height: 95,
             fit: BoxFit.cover,
-            cacheWidth: 190, // تحسين الأداء (Caching)
-            cacheHeight: 190,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return Container(
-                width: 95,
-                height: 95,
-                color: CafeTheme.surface,
-                child: Center(
-                  child: SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: CafeTheme.accent.withValues(alpha: 0.6),
-                    ),
+            memCacheWidth: 190,
+            memCacheHeight: 190,
+            placeholder: (context, url) => Container(
+              width: 95,
+              height: 95,
+              color: CafeTheme.surface,
+              child: Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: CafeTheme.accent.withValues(alpha: 0.6),
                   ),
                 ),
-              );
-            },
-            errorBuilder: (_, __, ___) => _fallbackIcon(),
+              ),
+            ),
+            errorWidget: (_, __, ___) => _fallbackIcon(),
           ),
         ),
       );
@@ -3442,12 +3640,12 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                               child:
                                   item['image_url'] != null &&
                                       item['image_url'].toString().isNotEmpty
-                                  ? Image.network(
-                                      item['image_url'],
+                                  ? CachedNetworkImage(
+                                      imageUrl: item['image_url'],
                                       fit: BoxFit.cover,
                                       width: double.infinity,
-                                      cacheWidth: 400,
-                                      errorBuilder: (ctx, err, stack) =>
+                                      memCacheWidth: 400,
+                                      errorWidget: (ctx, err, stack) =>
                                           const Icon(
                                             Icons.fastfood,
                                             color: CafeTheme.accent,
