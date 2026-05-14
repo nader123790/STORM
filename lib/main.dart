@@ -4,10 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cached_network_image/cached_network_image.dart';
-import 'dart:async';
 import 'dart:ui';
 import 'dart:math' as math;
-import 'dart:js' as js;
 import 'dart:html' as html;
 import 'theme.dart';
 import 'services/api_service.dart';
@@ -46,6 +44,31 @@ Widget buildstormLogo({double size = 60, Color? color}) {
     errorBuilder: (context, error, stackTrace) =>
         Icon(Icons.restaurant_menu, size: size, color: CafeTheme.accent),
   );
+}
+
+class _AppCache {
+  _AppCache._();
+  static final _AppCache instance = _AppCache._();
+
+  Future<QuerySnapshot>? categoriesFuture;
+  final Map<String, Future<QuerySnapshot>> productsFutures = {};
+  Future<QuerySnapshot>? allProductsFuture;
+
+  Future<QuerySnapshot> getCategories() {
+    categoriesFuture ??= FirebaseFirestore.instance.collection('categories').get();
+    return categoriesFuture!;
+  }
+
+  Future<QuerySnapshot> getProducts(String? cat) {
+    if (cat == null) {
+      allProductsFuture ??= FirebaseFirestore.instance.collection('products').get();
+      return allProductsFuture!;
+    }
+    if (!productsFutures.containsKey(cat)) {
+      productsFutures[cat] = FirebaseFirestore.instance.collection('products').where('cat', isEqualTo: cat).get();
+    }
+    return productsFutures[cat]!;
+  }
 }
 
 // ==========================================
@@ -117,9 +140,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   late AnimationController _glowController;
   late AnimationController _fabPulseController;
 
-  // ✅ Debounce لتقليل rebuilds عند البحث
-  Timer? _searchDebounce;
-
   final TextEditingController _noteController = TextEditingController();
   final TextEditingController _nameEntryController = TextEditingController();
   final TextEditingController _tableEntryController = TextEditingController();
@@ -142,7 +162,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    _searchDebounce?.cancel();
     _glowController.dispose();
     _fabPulseController.dispose();
     _catSearchCtrl.dispose();
@@ -305,8 +324,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                                   int newIdx = cats.indexWhere(
                                     (c) => c['name'] == catName,
                                   );
-                                  if (newIdx != -1)
+                                  if (newIdx != -1) {
                                     setState(() => currentCat = catName);
+                                  }
                                   Navigator.pop(context);
                                 },
                                 child: AnimatedContainer(
@@ -386,21 +406,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       }
     }
   }
-
-  void _playSound(String url, {double volume = 1.0}) {
-    if (kIsWeb) {
-      final normalizedVolume = volume.clamp(0.0, 1.0);
-      js.context.callMethod('eval', [
-        "(function() { var audio = new Audio('$url'); audio.volume = $normalizedVolume; audio.play(); })();",
-      ]);
-    }
-  }
-
-  void _playMicrowaveWorking() =>
-      _playSound("https://files.catbox.moe/ct6wzl.mp3");
-  void _playMicrowaveDone() =>
-      _playSound("https://files.catbox.moe/hecpqn.mp3");
-  void _playWaiterBell() => _playSound("https://files.catbox.moe/y77se9.mp3");
 
   void _initStatusListeners() {}
 
@@ -741,8 +746,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       children: [
         const _MenuBackground(),
         CustomScrollView(
-          // ✅ PageStorageKey يحافظ على scroll position
-          key: const PageStorageKey<String>('main_scroll'),
           physics: const BouncingScrollPhysics(
             parent: AlwaysScrollableScrollPhysics(),
           ),
@@ -750,8 +753,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             _buildCinematicHeader(),
             _buildSearchBar(),
             _buildCategoryCarouselSection(),
-            // ✅ المنتجات مباشرة كـ Sliver — بدون SliverToBoxAdapter
-            _buildProductSliverSection(),
+            SliverToBoxAdapter(child: _buildProductListSection()),
             const SliverToBoxAdapter(child: SizedBox(height: 350)),
           ],
         ),
@@ -962,13 +964,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           ),
           child: TextField(
             controller: _globalSearchCtrl,
-            // ✅ Debounce 350ms — يمنع rebuild عند كل ضغطة حرف
-            onChanged: (_) {
-              _searchDebounce?.cancel();
-              _searchDebounce = Timer(const Duration(milliseconds: 350), () {
-                if (mounted) setState(() {});
-              });
-            },
+            onChanged: (_) => setState(() {}),
             style: const TextStyle(color: CafeTheme.textMain, fontSize: 16),
             decoration: InputDecoration(
               hintText: "ابحث عن منتج أو قسم...",
@@ -995,8 +991,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 
   Widget _buildCategoryCarouselSection() {
     return SliverToBoxAdapter(
-      child: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('categories').snapshots(),
+      child: FutureBuilder<QuerySnapshot>(
+        future: _AppCache.instance.getCategories(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return const SizedBox(
@@ -1009,8 +1005,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
               ),
             );
           }
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
             return const SizedBox(height: 200);
+          }
 
           final cats = snapshot.data!.docs.toList()
             ..sort((a, b) {
@@ -1069,10 +1066,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 selectedCategory: currentCat,
                 onSelect: (catName) {
                   if (currentCat == catName) return;
-                  _playSound(
-                    "https://assets.mixkit.co/active_storage/sfx/270/270-preview.mp3",
-                    volume: 0.13,
-                  );
                   setState(() => currentCat = catName);
                 },
               ),
@@ -1123,41 +1116,14 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     );
   }
 
-  // ✅ يُرجع Sliver مباشرة — لا SliverToBoxAdapter، لا shrinkWrap
-  Widget _buildProductSliverSection() {
-    if (currentCat == null) return const SliverToBoxAdapter(child: SizedBox());
-
-    return _ProductStreamSliver(
-      category: currentCat!,
-      searchQuery: _globalSearchCtrl.text.trim(),
-      basket: basket,
-      onAddItem: _showAddDialog,
-      onQuantityChange: (idx, increase) {
-        setState(() {
-          if (increase) {
-            basket[idx]['quantity']++;
-          } else {
-            if (basket[idx]['quantity'] > 1) {
-              basket[idx]['quantity']--;
-            } else {
-              basket.removeAt(idx);
-            }
-          }
-        });
-      },
-    );
-  }
-
-  // الدالة القديمة نبقيها للتوافق الداخلي (غير مستخدمة في CustomScrollView الجديد)
   Widget _buildProductListSection() {
     if (currentCat == null) return const SizedBox();
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('products')
-          .where('cat', isEqualTo: currentCat)
-          .snapshots(),
+
+    return FutureBuilder<QuerySnapshot>(
+      future: _AppCache.instance.getProducts(currentCat),
       builder: (context, snapshot) {
         if (snapshot.hasError || !snapshot.hasData) return const SizedBox();
+
         var items = snapshot.data!.docs;
         String q = _globalSearchCtrl.text.trim();
         if (q.isNotEmpty) {
@@ -1166,6 +1132,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             return name.contains(q);
           }).toList();
         }
+
         if (items.isEmpty) {
           return const Padding(
             padding: EdgeInsets.all(50),
@@ -1177,6 +1144,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             ),
           );
         }
+
         return UFOBeamProductSection(
           items: items.map((d) => d.data() as Map<String, dynamic>).toList(),
           categoryName: currentCat ?? '',
@@ -1405,14 +1373,13 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           .where('customer_name', isEqualTo: registeredName)
           .snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return const SizedBox();
+        }
         var orders = snapshot.data!.docs;
         return SizedBox(
           height: 125,
           child: ListView.builder(
-            // ✅ يحافظ على scroll position بين الـ rebuilds
-            key: const PageStorageKey<String>('active_orders'),
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -1488,8 +1455,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     return SizedBox(
       height: 140,
       child: ListView.builder(
-        // ✅ PageStorageKey يحافظ على scroll position للسلة
-        key: const PageStorageKey<String>('basket_row'),
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.only(top: 14, left: 24, right: 24),
@@ -1827,8 +1792,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                           ? "بدون إضافات"
                           : _noteController.text;
                       String itemName = item['name'];
-                      if (selectedSize != null)
+                      if (selectedSize != null) {
                         itemName += " (${selectedSize!['name']})";
+                      }
 
                       int index = basket.indexWhere(
                         (e) =>
@@ -2095,8 +2061,9 @@ class _CinematicCategoryCarouselState extends State<CinematicCategoryCarousel> {
   void didUpdateWidget(covariant CinematicCategoryCarousel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.selectedCategory == null ||
-        widget.selectedCategory == oldWidget.selectedCategory)
+        widget.selectedCategory == oldWidget.selectedCategory) {
       return;
+    }
     final newIndex = widget.categories.indexWhere(
       (doc) => (doc['name'] ?? '').toString() == widget.selectedCategory,
     );
@@ -2228,8 +2195,7 @@ class _CinematicCategoryCarouselState extends State<CinematicCategoryCarousel> {
   }
 }
 
-// ✅ StatelessWidget — بدون hover state (كان بيسبب setState لكل كارت في الكاروسيل)
-class _CategoryCard extends StatelessWidget {
+class _CategoryCard extends StatefulWidget {
   final String name;
   final IconData icon;
   final bool isSelected;
@@ -2250,69 +2216,99 @@ class _CategoryCard extends StatelessWidget {
     required this.onTap,
   });
 
-  static const _selectedGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Color(0xF57A4D2A), Color(0xE6A0622A), Color(0xE05F3814)],
-  );
+  @override
+  State<_CategoryCard> createState() => _CategoryCardState();
+}
+
+class _CategoryCardState extends State<_CategoryCard> {
+  bool _isHovered = false;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(32),
-          color: isSelected ? null : Colors.black.withValues(alpha: 0.3),
-          gradient: isSelected ? _selectedGradient : null,
-          border: Border.all(
-            color: isSelected
-                ? CafeTheme.secondaryBrown.withValues(alpha: 0.7)
-                : CafeTheme.primaryBrown.withValues(alpha: 0.2),
-            width: isSelected ? 2.0 : 1.2,
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOutCubic,
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+          transform: Matrix4.translationValues(0, _isHovered ? -5 : 0, 0),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(32), // زوايا دائرية أكثر
+            color: widget.isSelected
+                ? null
+                : Colors.black.withValues(alpha: 0.3), // شفافية خفيفة
+            gradient: widget.isSelected
+                ? LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      const Color(0xFF7A4D2A).withValues(alpha: 0.96),
+                      CafeTheme.primaryBrown.withValues(alpha: 0.90),
+                      const Color(0xFF5F3814).withValues(alpha: 0.88),
+                    ],
+                  )
+                : null,
+            border: Border.all(
+              color: widget.isSelected
+                  ? CafeTheme.secondaryBrown.withValues(alpha: 0.7)
+                  : CafeTheme.primaryBrown.withValues(
+                      alpha: _isHovered ? 0.4 : 0.2,
+                    ),
+              width: widget.isSelected ? 2.0 : 1.2,
+            ),
+            boxShadow: widget.isSelected
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFFC49A6D).withValues(alpha: 0.35),
+                      blurRadius: 45,
+                      spreadRadius: 2,
+                    ),
+                    BoxShadow(
+                      color: CafeTheme.primaryBrown.withValues(alpha: 0.3),
+                      blurRadius: 30,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 12,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
           ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: const Color(0xFFC49A6D).withValues(alpha: 0.35),
-                    blurRadius: 45,
-                    spreadRadius: 2,
-                  ),
-                  BoxShadow(
-                    color: CafeTheme.primaryBrown.withValues(alpha: 0.3),
-                    blurRadius: 30,
-                    spreadRadius: 1,
-                  ),
-                ]
-              : null,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: active ? iconSize : iconSize - 8,
-                color: isSelected
-                    ? const Color(0xFFF5E6D3)
-                    : CafeTheme.primaryBrown.withValues(alpha: 0.8),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                name,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.0,
-                  fontSize: active ? fontSizeActive : fontSizeInactive,
-                  color: isSelected ? Colors.white : Colors.white70,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  widget.icon,
+                  size: widget.active ? widget.iconSize : widget.iconSize - 8,
+                  color: widget.isSelected
+                      ? const Color(0xFFF5E6D3)
+                      : CafeTheme.primaryBrown.withValues(alpha: 0.8),
                 ),
-              ),
-            ],
+                const SizedBox(height: 14),
+                Text(
+                  widget.name,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.0,
+                    fontSize: widget.active
+                        ? widget.fontSizeActive
+                        : widget.fontSizeInactive,
+                    color: widget.isSelected ? Colors.white : Colors.white70,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -2322,161 +2318,6 @@ class _CategoryCard extends StatelessWidget {
 
 // ==========================================
 // NEON PRODUCT SECTION — خفيف وسريع
-// ==========================================
-// ==========================================
-// _ProductStreamSliver — يعزل Stream عن باقي الـ widget tree
-// الـ StreamBuilder هنا مش بيعمل rebuild للـ Header أو الـ SearchBar
-// ==========================================
-class _ProductStreamSliver extends StatefulWidget {
-  final String category;
-  final String searchQuery;
-  final List<Map<String, dynamic>> basket;
-  final Function(Map<String, dynamic>) onAddItem;
-  final Function(int idx, bool increase) onQuantityChange;
-
-  const _ProductStreamSliver({
-    required this.category,
-    required this.searchQuery,
-    required this.basket,
-    required this.onAddItem,
-    required this.onQuantityChange,
-  });
-
-  @override
-  State<_ProductStreamSliver> createState() => _ProductStreamSliverState();
-}
-
-class _ProductStreamSliverState extends State<_ProductStreamSliver>
-    with AutomaticKeepAliveClientMixin {
-  // ✅ Pagination — يجلب أول 20 منتج ويوسّع عند الحاجة
-  static const int _pageSize = 20;
-  int _loadedCount = _pageSize;
-  List<Map<String, dynamic>> _allItems = [];
-  bool _hasMore = false;
-
-  @override
-  bool get wantKeepAlive => true; // ✅ يحافظ على الحالة عند tab switch
-
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('products')
-          .where('cat', isEqualTo: widget.category)
-          .limit(_loadedCount) // ✅ Pagination: limit الـ query
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError || !snapshot.hasData) {
-          return const SliverToBoxAdapter(child: SizedBox());
-        }
-
-        var docs = snapshot.data!.docs;
-        _hasMore = docs.length == _loadedCount;
-
-        var items = docs;
-        if (widget.searchQuery.isNotEmpty) {
-          items = docs.where((doc) {
-            final name = (doc['name'] ?? '').toString();
-            return name.contains(widget.searchQuery);
-          }).toList();
-        }
-
-        if (items.isEmpty) {
-          return const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.all(50),
-              child: Center(
-                child: Text(
-                  'لا توجد منتجات في هذا القسم',
-                  style: TextStyle(color: Colors.white54, fontSize: 16),
-                ),
-              ),
-            ),
-          );
-        }
-
-        _allItems =
-            items.map((d) => d.data() as Map<String, dynamic>).toList();
-
-        // ✅ O(1) basket lookup — مرة واحدة قبل SliverList
-        final Map<String, int> basketIndexMap = {
-          for (int i = 0; i < widget.basket.length; i++)
-            widget.basket[i]['name'] as String: i,
-        };
-
-        return SliverMainAxisGroup(
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, i) {
-                    final item = _allItems[i];
-                    final String name = item['name'] ?? '';
-                    final int? bIdx = basketIndexMap[name];
-                    final bool inBasket = bIdx != null;
-                    return RepaintBoundary(
-                      child: _NeonProductCard(
-                        key: ValueKey('${widget.category}_$name'),
-                        item: item,
-                        inBasket: inBasket,
-                        qty: inBasket
-                            ? (widget.basket[bIdx!]['quantity'] as int)
-                            : 0,
-                        onAdd: () => widget.onAddItem(item),
-                        onMinus: inBasket
-                            ? () => widget.onQuantityChange(bIdx!, false)
-                            : null,
-                        onPlus: inBasket
-                            ? () => widget.onQuantityChange(bIdx!, true)
-                            : null,
-                      ),
-                    );
-                  },
-                  childCount: _allItems.length,
-                ),
-              ),
-            ),
-            // ✅ زر "تحميل المزيد" عند وجود منتجات إضافية
-            if (_hasMore && widget.searchQuery.isEmpty)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 40, vertical: 8),
-                  child: OutlinedButton.icon(
-                    onPressed: () =>
-                        setState(() => _loadedCount += _pageSize),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: CafeTheme.primaryBrown),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    icon: const Icon(
-                      Icons.expand_more_rounded,
-                      color: CafeTheme.primaryBrown,
-                    ),
-                    label: const Text(
-                      'تحميل المزيد',
-                      style: TextStyle(
-                        color: CafeTheme.primaryBrown,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-// ==========================================
-// UFOBeamProductSection — Sliver-based, no shrinkWrap, O(1) basket lookup
 // ==========================================
 class UFOBeamProductSection extends StatelessWidget {
   final List<Map<String, dynamic>> items;
@@ -2497,47 +2338,44 @@ class UFOBeamProductSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (items.isEmpty) return const SizedBox();
+    
+    // O(1) Map lookup as requested
+    final Map<String, int> basketLookup = {};
+    for (int j = 0; j < basket.length; j++) {
+      basketLookup[basket[j]['name']] = j;
+    }
 
-    // ✅ O(1) basket lookup — built once, never inside itemBuilder
-    final Map<String, int> basketIndexMap = {
-      for (int i = 0; i < basket.length; i++) basket[i]['name'] as String: i,
-    };
-
-    return SliverPadding(
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      sliver: SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (context, i) {
-            final item = items[i];
-            final String name = item['name'] ?? '';
-            final int? bIdx = basketIndexMap[name];
-            final bool inBasket = bIdx != null;
-            return RepaintBoundary(
-              child: _NeonProductCard(
-                key: ValueKey('${categoryName}_$name'),
-                item: item,
-                inBasket: inBasket,
-                qty: inBasket ? (basket[bIdx!]['quantity'] as int) : 0,
-                onAdd: () => onAddItem(item),
-                onMinus: inBasket ? () => onQuantityChange(bIdx!, false) : null,
-                onPlus: inBasket ? () => onQuantityChange(bIdx!, true) : null,
-              ),
-            );
-          },
-          childCount: items.length,
-        ),
+      child: Column(
+        children: List.generate(items.length, (i) {
+          final item = items[i];
+          final String name = item['name'] ?? '';
+          final int basketIdx = basketLookup[name] ?? -1;
+          final bool inBasket = basketIdx != -1;
+          return RepaintBoundary(
+            child: _NeonProductCard(
+              key: ValueKey('${categoryName}_$name'),
+              item: item,
+              inBasket: inBasket,
+              qty: inBasket ? (basket[basketIdx]['quantity'] as int) : 0,
+              onAdd: () => onAddItem(item),
+              onMinus: inBasket
+                  ? () => onQuantityChange(basketIdx, false)
+                  : null,
+              onPlus: inBasket ? () => onQuantityChange(basketIdx, true) : null,
+            ),
+          );
+        }),
       ),
     );
   }
 }
 
 // ==========================================
-// كارت المنتج - StatelessWidget خفيف، نفس الـ UI بدون AnimationController لكل كارت
-// ✅ الـ hover effect اتشال من كل كارت (كان بيسبب setState لكل list item)
-// ✅ الـ particle burst اتشال (كان بيعمل AnimationController لكل منتج في الـ list)
-// ✅ الـ gradient ثابت (مش بيتحسب في runtime على كل frame)
+// كارت المنتج - Premium مع particle burst
 // ==========================================
-class _NeonProductCard extends StatelessWidget {
+class _NeonProductCard extends StatefulWidget {
   final Map<String, dynamic> item;
   final bool inBasket;
   final int qty;
@@ -2555,79 +2393,164 @@ class _NeonProductCard extends StatelessWidget {
     required this.onPlus,
   });
 
-  // ✅ ثوابت static — لا تُعاد في كل build
-  static const _gradientNormal = LinearGradient(
-    begin: Alignment.centerRight,
-    end: Alignment.centerLeft,
-    colors: [Color(0xB31A0F05), Color(0xB32E1F10), Color(0xCC0D0804)],
-  );
-  static const _gradientInBasket = LinearGradient(
-    begin: Alignment.centerRight,
-    end: Alignment.centerLeft,
-    colors: [Color(0xCC1A2A10), Color(0xCC0D1A05), Color(0xE60D0804)],
-  );
-  static const _barGradientNormal = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: [CafeTheme.primaryBrown, Color(0xFF7A4D2A)],
-  );
-  static const _barGradientInBasket = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: [CafeTheme.success, Color(0xFF4CAF50)],
-  );
+  @override
+  State<_NeonProductCard> createState() => _NeonProductCardState();
+}
+
+class _NeonProductCardState extends State<_NeonProductCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _burstCtrl;
+  bool _showBurst = false;
+  bool _isHovered = false;
+
+  final List<_Particle> _particles = [];
+  final math.Random _rng = math.Random();
+
+  @override
+  void initState() {
+    super.initState();
+    _burstCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+    _burstCtrl.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        if (mounted) setState(() => _showBurst = false);
+        _burstCtrl.reset();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _burstCtrl.dispose();
+    super.dispose();
+  }
+
+  void _triggerBurst() {
+    _particles.clear();
+    for (int i = 0; i < 20; i++) {
+      final double angle = (i / 20) * math.pi * 2 + _rng.nextDouble() * 0.4;
+      final double speed = 45 + _rng.nextDouble() * 60;
+      final double size = 4 + _rng.nextDouble() * 5;
+      final Color color = [
+        CafeTheme.primaryBrown,
+        CafeTheme.secondaryBrown,
+        CafeTheme.success,
+        Colors.white,
+        const Color(0xFFD4A96A),
+      ][i % 5];
+      _particles.add(
+        _Particle(angle: angle, speed: speed, size: size, color: color),
+      );
+    }
+    setState(() => _showBurst = true);
+    _burstCtrl.forward();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final String name = item['name'] ?? '';
+    final String name = widget.item['name'] ?? '';
     final bool hasSizes =
-        item['sizes'] != null && (item['sizes'] as List).isNotEmpty;
-    final String priceText =
-        hasSizes ? 'أحجام متعددة' : '${item['price']} ج.م';
+        widget.item['sizes'] != null &&
+        (widget.item['sizes'] as List).isNotEmpty;
+    final String priceText = hasSizes
+        ? 'أحجام متعددة'
+        : '${widget.item['price']} ج.م';
+    final bool inBasket = widget.inBasket;
     final Color accent = inBasket ? CafeTheme.success : CafeTheme.primaryBrown;
+    final Color accentDim = inBasket
+        ? const Color(0xFF4CAF50)
+        : const Color(0xFF7A4D2A);
 
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        // ✅ Container ثابت بدون AnimatedContainer أو MouseRegion
-        Container(
-          margin: const EdgeInsets.only(bottom: 20),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            gradient: inBasket ? _gradientInBasket : _gradientNormal,
-            border: Border.all(
-              color: accent.withValues(alpha: inBasket ? 0.80 : 0.25),
-              width: inBasket ? 2.0 : 1.2,
+        MouseRegion(
+          onEnter: (_) => setState(() => _isHovered = true),
+          onExit: (_) => setState(() => _isHovered = false),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutCubic,
+            margin: const EdgeInsets.only(bottom: 20),
+            transform: Matrix4.translationValues(
+              0,
+              _isHovered && !inBasket ? -4 : 0,
+              0,
             ),
-            // ✅ shadow فقط لما يكون في السلة (مش على كل كارت)
-            boxShadow: inBasket
-                ? [
-                    BoxShadow(
-                      color: CafeTheme.success.withValues(alpha: 0.30),
-                      blurRadius: 20,
-                      spreadRadius: 1,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                : null,
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(28),
-            child: Row(
-              children: [
-                // ✅ شريط لوني جانبي — ثابت بدون AnimatedContainer
-                Container(
-                  width: 6,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    gradient:
-                        inBasket ? _barGradientInBasket : _barGradientNormal,
-                  ),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(
+                28,
+              ), // تكبير الـ Border Radius
+              color: Colors.black.withValues(
+                alpha: 0.4,
+              ), // شفافية إضافية للخلفية
+              gradient: LinearGradient(
+                begin: Alignment.centerRight,
+                end: Alignment.centerLeft,
+                colors: inBasket
+                    ? [
+                        const Color(0xFF1A2A10).withValues(alpha: 0.8),
+                        const Color(0xFF0D1A05).withValues(alpha: 0.8),
+                        const Color(0xFF0D0804).withValues(alpha: 0.9),
+                      ]
+                    : _isHovered
+                    ? [
+                        const Color(0xFF251505).withValues(alpha: 0.8),
+                        const Color(0xFF3A2815).withValues(alpha: 0.8),
+                        const Color(0xFF120A02).withValues(alpha: 0.9),
+                      ]
+                    : [
+                        const Color(0xFF1A0F05).withValues(alpha: 0.7),
+                        const Color(0xFF2E1F10).withValues(alpha: 0.7),
+                        const Color(0xFF0D0804).withValues(alpha: 0.8),
+                      ],
+              ),
+              border: Border.all(
+                color: accent.withValues(
+                  alpha: inBasket ? 0.80 : (_isHovered ? 0.50 : 0.25),
                 ),
-                const SizedBox(width: 18),
-                // الصورة
-                _buildItemImage(item),
-                const SizedBox(width: 20),
+                width: inBasket ? 2.0 : (_isHovered ? 1.5 : 1.2),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: accent.withValues(
+                    alpha: inBasket ? 0.35 : (_isHovered ? 0.20 : 0.05),
+                  ),
+                  blurRadius: inBasket ? 25 : (_isHovered ? 18 : 10),
+                  spreadRadius: inBasket ? 2 : 0,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(28),
+              child: Row(
+                children: [
+                  // شريط لوني جانبي
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    width: 6,
+                    height: 120, // تكبير الارتفاع
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [accent, accentDim],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: accent.withValues(alpha: 0.8),
+                          blurRadius: 10,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 18),
+                  // الصورة - بحجم أكبر
+                  _buildItemImage(widget.item),
+                  const SizedBox(width: 20),
                   // الاسم والسعر
                   Expanded(
                     child: Padding(
@@ -2706,13 +2629,17 @@ class _NeonProductCard extends StatelessWidget {
                     ),
                     child: inBasket
                         ? _QuantityControl(
-                            qty: qty,
-                            onMinus: onMinus!,
-                            onPlus: onPlus!,
+                            qty: widget.qty,
+                            onMinus: widget.onMinus!,
+                            onPlus: widget.onPlus!,
                           )
                         : GestureDetector(
-                            onTap: onAdd,
-                            child: Container(
+                            onTap: () {
+                              widget.onAdd();
+                              _triggerBurst();
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
                               width: 50,
                               height: 50,
                               decoration: BoxDecoration(
@@ -2729,10 +2656,10 @@ class _NeonProductCard extends StatelessWidget {
                                 boxShadow: [
                                   BoxShadow(
                                     color: CafeTheme.primaryBrown.withValues(
-                                      alpha: 0.55,
+                                      alpha: _isHovered ? 0.85 : 0.60,
                                     ),
-                                    blurRadius: 14,
-                                    offset: const Offset(0, 4),
+                                    blurRadius: _isHovered ? 22 : 15,
+                                    offset: const Offset(0, 5),
                                   ),
                                 ],
                               ),
@@ -2748,6 +2675,7 @@ class _NeonProductCard extends StatelessWidget {
               ),
             ),
           ),
+        ),
 
         // badge "في السلة"
         if (inBasket)
@@ -2787,17 +2715,36 @@ class _NeonProductCard extends StatelessWidget {
               ),
             ),
           ),
+
+        // طبقة الجزيئات
+        if (_showBurst)
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 20,
+            child: IgnorePointer(
+              child: AnimatedBuilder(
+                animation: _burstCtrl,
+                builder: (context, _) => CustomPaint(
+                  painter: _ParticleBurstPainter(
+                    particles: _particles,
+                    progress: _burstCtrl.value,
+                  ),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
 
-  // ✅ static method — لا تحتاج instance
-  static Widget _buildItemImage(Map<String, dynamic> item) {
+  Widget _buildItemImage(Map<String, dynamic> item) {
     final String? imageUrl = item['image_url'];
     if (imageUrl != null && imageUrl.isNotEmpty) {
       return Container(
         width: 95,
-        height: 95,
+        height: 95, // تكبير الصورة
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
@@ -2810,7 +2757,6 @@ class _NeonProductCard extends StatelessWidget {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(20),
-          // ✅ CachedNetworkImage — تخزين مؤقت على القرص، لا يعيد التحميل عند rebuild
           child: CachedNetworkImage(
             imageUrl: imageUrl,
             width: 95,
@@ -2833,7 +2779,7 @@ class _NeonProductCard extends StatelessWidget {
                 ),
               ),
             ),
-            errorWidget: (_, __, ___) => _fallbackIcon(),
+            errorWidget: (context, url, error) => _fallbackIcon(),
           ),
         ),
       );
@@ -2841,7 +2787,7 @@ class _NeonProductCard extends StatelessWidget {
     return _fallbackIcon();
   }
 
-  static Widget _fallbackIcon() {
+  Widget _fallbackIcon() {
     return Container(
       width: 95,
       height: 95,
@@ -2869,8 +2815,7 @@ class _NeonProductCard extends StatelessWidget {
   }
 }
 
-// _Particle و _ParticleBurstPainter محتفظ بيهم للـ WaiterTerminal لو محتاجهم
-// لكن _NeonProductCard مش بيستخدمهم تاني
+// بيانات جسيمة واحدة
 class _Particle {
   final double angle;
   final double speed;
@@ -2996,16 +2941,21 @@ class _QuantityControl extends StatelessWidget {
 
 IconData _categoryIconByName(String name) {
   final normalized = name.toLowerCase();
-  if (normalized.contains('برجر') || normalized.contains('burger'))
+  if (normalized.contains('برجر') || normalized.contains('burger')) {
     return Icons.lunch_dining_rounded;
-  if (normalized.contains('بيتزا') || normalized.contains('pizza'))
+  }
+  if (normalized.contains('بيتزا') || normalized.contains('pizza')) {
     return Icons.local_pizza_rounded;
-  if (normalized.contains('مكرونة') || normalized.contains('باستا'))
+  }
+  if (normalized.contains('مكرونة') || normalized.contains('باستا')) {
     return Icons.ramen_dining_rounded;
-  if (normalized.contains('مشروب') || normalized.contains('drink'))
+  }
+  if (normalized.contains('مشروب') || normalized.contains('drink')) {
     return Icons.local_drink_rounded;
-  if (normalized.contains('حلويات') || normalized.contains('dessert'))
+  }
+  if (normalized.contains('حلويات') || normalized.contains('dessert')) {
     return Icons.cake_rounded;
+  }
   return Icons.restaurant_menu_rounded;
 }
 
@@ -3042,14 +2992,6 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
     searchCtrl.dispose();
     noteCtrl.dispose();
     super.dispose();
-  }
-
-  void _playSound(String url) {
-    if (kIsWeb) {
-      js.context.callMethod('eval', [
-        "(function() { var audio = new Audio('$url'); audio.play(); })();",
-      ]);
-    }
   }
 
   void _showWaiterAddDialog(Map<String, dynamic> item) {
@@ -3177,8 +3119,9 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                           ? "بدون ملاحظات"
                           : noteCtrl.text;
                       String itemName = item['name'];
-                      if (selectedSize != null)
+                      if (selectedSize != null) {
                         itemName += " (${selectedSize!['name']})";
+                      }
 
                       int index = waiterBasket.indexWhere(
                         (e) =>
@@ -3374,10 +3317,8 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
         const SizedBox(height: 16),
         SizedBox(
           height: 45,
-          child: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('categories')
-                .snapshots(),
+          child: FutureBuilder<QuerySnapshot>(
+            future: _AppCache.instance.getCategories(),
             builder: (context, snapshot) {
               if (!snapshot.hasData) return const SizedBox();
               var cats = snapshot.data!.docs.toList()
@@ -3435,13 +3376,8 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
         ),
         const SizedBox(height: 16),
         Expanded(
-          child: StreamBuilder<QuerySnapshot>(
-            stream: selectedCategory == null
-                ? FirebaseFirestore.instance.collection('products').snapshots()
-                : FirebaseFirestore.instance
-                      .collection('products')
-                      .where('cat', isEqualTo: selectedCategory)
-                      .snapshots(),
+          child: FutureBuilder<QuerySnapshot>(
+            future: _AppCache.instance.getProducts(selectedCategory),
             builder: (context, snapshot) {
               if (!snapshot.hasData) {
                 return const Center(
@@ -3511,12 +3447,18 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                                       fit: BoxFit.cover,
                                       width: double.infinity,
                                       memCacheWidth: 400,
-                                      errorWidget: (ctx, err, stack) =>
-                                          const Icon(
-                                            Icons.fastfood,
-                                            color: CafeTheme.accent,
-                                            size: 45,
-                                          ),
+                                      placeholder: (context, url) => const Center(
+                                        child: SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(strokeWidth: 2, color: CafeTheme.accent),
+                                        ),
+                                      ),
+                                      errorWidget: (context, url, error) => const Icon(
+                                        Icons.fastfood,
+                                        color: CafeTheme.accent,
+                                        size: 45,
+                                      ),
                                     )
                                   : const Icon(
                                       Icons.fastfood,
@@ -3848,13 +3790,12 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
         children: [
           ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: 250),
-            child: ListView.builder(
-              shrinkWrap: true,
+            child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
-              itemCount: waiterBasket.length,
-              itemBuilder: (context, index) {
-                var item = waiterBasket[index];
-                return Container(
+              child: Column(
+                children: List.generate(waiterBasket.length, (index) {
+                  var item = waiterBasket[index];
+                  return Container(
                   margin: const EdgeInsets.symmetric(vertical: 6),
                   padding: const EdgeInsets.symmetric(
                     vertical: 10,
@@ -3923,10 +3864,11 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                     ],
                   ),
                 );
-              },
+              }),
             ),
           ),
-          const SizedBox(height: 20),
+        ),
+        const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
             height: 55,
