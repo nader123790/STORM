@@ -1,16 +1,3 @@
-// ignore_for_file: deprecated_member_use, avoid_web_libraries_in_flutter
-//
-// =============================================================
-//  STORM CAFÉ — Fully Optimised Flutter Web Build
-//  Senior Performance Engineer Refactor
-// =============================================================
-//
-// DEPENDENCY ADDITIONS (pubspec.yaml):
-//   flutter_riverpod: ^2.5.1
-//   cached_network_image: ^3.3.1
-//
-// Every optimisation is explained inline with a WHY comment.
-
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:js' as js;
