@@ -2,11 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'dart:ui';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:js' as js;
 
 import 'firebase_options.dart';
 import 'services/api_service.dart';
 
-// Utility class for Category Icons since we cannot import external non-standard files
+// ==========================================
+// Singleton ApiService
+// ==========================================
+final ApiService apiService = ApiService();
+
+// ==========================================
+// Utility class for Category Icons
+// ==========================================
 class CategoryIcons {
   static IconData resolve(String name) {
     if (name.contains("قهوة") ||
@@ -127,6 +136,18 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   bool _isEntryComplete = false;
   bool _isWaiterAlertActive = false;
 
+  // ✦ ميزة 1: بحث في المنيو
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = "";
+  bool _showSearch = false;
+
+  // ✦ ميزة 2: المفضلة
+  final Set<String> _favorites = {};
+  bool _showFavoritesOnly = false;
+
+  // ✦ ميزة 4: وضع العرض
+  bool _isGridView = false;
+
   late AnimationController _glowController;
   late AnimationController _devPulseController;
 
@@ -155,15 +176,26 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     _noteController.dispose();
     _nameEntryController.dispose();
     _tableEntryController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   void _playSound(String url) {
-    debugPrint("Play sound requested: $url");
+    try {
+      js.context.callMethod('eval', [
+        'try { var a = new Audio("$url"); a.play().catch(function(){}); } catch(e){}'
+      ]);
+    } catch (e) {
+      debugPrint("Sound error: $e");
+    }
   }
 
   void _openUrl(String url) {
-    debugPrint("Open URL requested: $url");
+    try {
+      js.context.callMethod('open', [url, '_blank']);
+    } catch (e) {
+      debugPrint("URL open error: $e");
+    }
   }
 
   void _playMicrowaveWorking() =>
@@ -198,7 +230,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       for (var change in snapshot.docChanges) {
         if (change.type == DocumentChangeType.modified) {
           var data = change.doc.data() as Map<String, dynamic>;
-          String status = data['status'];
+          String status = data['status'] ?? '';
           if (status == 'جاري التجهيز') {
             _playMicrowaveWorking();
             _showStatusSnackBar(
@@ -218,6 +250,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   }
 
   void _showStatusSnackBar(String message, Color color) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -240,86 +273,276 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       context: context,
       builder: (context) => BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: AlertDialog(
-          backgroundColor: const Color(0xFF120C05),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
-            side: BorderSide(
-                color: CafeTheme.primaryGold.withValues(alpha: 0.5),
-                width: 0.5),
-          ),
-          title: const Text(
-            "تواصل مع المطور 👨‍💻",
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: CafeTheme.primaryGold,
-              fontWeight: FontWeight.bold,
+        child: Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 380),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1A1008), Color(0xFF0D0904)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(32),
+              border: Border.all(
+                color: CafeTheme.primaryGold.withValues(alpha: 0.4),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: CafeTheme.primaryGold.withValues(alpha: 0.15),
+                  blurRadius: 30,
+                  spreadRadius: 2,
+                ),
+              ],
             ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                "Nader Soltan",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.2,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(28),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        CafeTheme.primaryGold.withValues(alpha: 0.15),
+                        Colors.transparent,
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(32),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      AnimatedBuilder(
+                        animation: _devPulseController,
+                        builder: (context, child) => Container(
+                          width: 88,
+                          height: 88,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const LinearGradient(
+                              colors: [
+                                CafeTheme.primaryGold,
+                                CafeTheme.warmBrown,
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: CafeTheme.primaryGold.withValues(
+                                  alpha: 0.3 + 0.3 * _devPulseController.value,
+                                ),
+                                blurRadius: 20,
+                                spreadRadius: 3,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.person_rounded,
+                            color: Colors.black,
+                            size: 46,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        "Nader Soltan",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [
+                              CafeTheme.primaryGold,
+                              CafeTheme.warmBrown
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          "✦ AI Engineer & Flutter Dev",
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const Text(
-                "AI Engineer",
-                style: TextStyle(
-                  fontSize: 12,
-                  color: CafeTheme.primaryGold,
-                  fontWeight: FontWeight.bold,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+                  child: Column(
+                    children: [
+                      _devContactTile(
+                        Icons.chat_rounded,
+                        "WhatsApp",
+                        "تواصل مباشرة",
+                        const Color(0xFF25D366),
+                        const Color(0xFF128C7E),
+                        "https://wa.me/qr/QS4SMJ54AKJMF1",
+                      ),
+                      _devContactTile(
+                        Icons.facebook_rounded,
+                        "Facebook",
+                        "تابعني على فيسبوك",
+                        const Color(0xFF1877F2),
+                        const Color(0xFF0D47A1),
+                        "https://www.facebook.com/share/1ByWx21qNW/",
+                      ),
+                      _devContactTile(
+                        Icons.camera_alt_rounded,
+                        "Instagram",
+                        "شوف أعمالي",
+                        const Color(0xFFE1306C),
+                        const Color(0xFF833AB4),
+                        "https://www.instagram.com/nadersoltan294?igsh=bDB5eTB3Z2NrMmF6",
+                      ),
+                      _devContactTile(
+                        Icons.music_note_rounded,
+                        "TikTok",
+                        "محتوى تقني حلو",
+                        Colors.white,
+                        Colors.grey.shade800,
+                        "https://www.tiktok.com/@nadersoltan6?_r=1&_t=ZS-93Uf8vOauIB",
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 25),
-              _devLink(
-                Icons.chat_bubble_outline,
-                "WhatsApp",
-                Colors.green,
-                "https://wa.me/qr/QS4SMJ54AKJMF1",
-              ),
-              _devLink(
-                Icons.facebook_outlined,
-                "Facebook",
-                Colors.blueAccent,
-                "https://www.facebook.com/share/1ByWx21qNW/",
-              ),
-              _devLink(
-                Icons.camera_alt_outlined,
-                "Instagram",
-                Colors.pinkAccent,
-                "https://www.instagram.com/nadersoltan294?igsh=bDB5eTB3Z2NrMmF6",
-              ),
-              _devLink(
-                Icons.video_collection_outlined,
-                "TikTok",
-                Colors.white,
-                "https://www.tiktok.com/@nadersoltan6?_r=1&_t=ZS-93Uf8vOauIB",
-              ),
-              const Divider(color: Colors.white10, height: 30),
-              const Text(
-                "Call: 01012078944",
-                style: TextStyle(
-                  color: CafeTheme.primaryGold,
-                  fontWeight: FontWeight.bold,
+                Container(
+                  margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: CafeTheme.primaryGold.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: CafeTheme.primaryGold.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.phone_rounded,
+                        color: CafeTheme.primaryGold,
+                        size: 18,
+                      ),
+                      SizedBox(width: 10),
+                      Text(
+                        "01012078944",
+                        style: TextStyle(
+                          color: CafeTheme.primaryGold,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _devLink(IconData icon, String label, Color color, String url) {
-    return ListTile(
-      leading: Icon(icon, color: color),
-      title: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-      onTap: () => _openUrl(url),
+  Widget _devContactTile(
+    IconData icon,
+    String platform,
+    String subtitle,
+    Color colorFrom,
+    Color colorTo,
+    String url,
+  ) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.pop(context);
+        _openUrl(url);
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              colorFrom.withValues(alpha: 0.12),
+              colorTo.withValues(alpha: 0.06),
+            ],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: colorFrom.withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [colorFrom, colorTo],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: Icon(icon, color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    platform,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.45),
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              color: colorFrom.withValues(alpha: 0.7),
+              size: 14,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -591,7 +814,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 Container(color: CafeTheme.darkBg),
           ),
         ),
-        // Frosted glass overlay - نص نص
         Positioned.fill(
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
@@ -604,7 +826,12 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           physics: const BouncingScrollPhysics(),
           slivers: [
             _buildAppBar(),
+            _buildWelcomeBanner(),
+            _buildKitchenStatusBanner(),
+            _buildDailySpecial(),
             _buildBestSellers(),
+            // ✦ ميزة 1: شريط البحث والفلاتر
+            _buildSearchAndFilterBar(),
             _buildCategories(),
             _buildMenuLabel(),
             _buildProductsGrid(),
@@ -685,7 +912,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             ),
             if (registeredName != null)
               Text(
-                "طاولة $currentTable | $registeredName",
+                "$_timeGreeting | طاولة $currentTable | $registeredName",
                 style: const TextStyle(fontSize: 10, color: Colors.white60),
               ),
             const SizedBox(height: 15),
@@ -693,7 +920,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         ),
       ),
       actions: [
-        // زرار تغيير الطاولة
         if (registeredName != null)
           Padding(
             padding: const EdgeInsets.only(top: 12),
@@ -779,6 +1005,216 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     );
   }
 
+  // ==========================================
+  // ✦ ميزة 1: شريط البحث والفلاتر
+  // ==========================================
+  Widget _buildSearchAndFilterBar() {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                // زرار البحث
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _showSearch = !_showSearch;
+                      if (!_showSearch) {
+                        _searchQuery = "";
+                        _searchController.clear();
+                      }
+                    });
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _showSearch
+                          ? CafeTheme.primaryGold.withValues(alpha: 0.2)
+                          : Colors.white.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: _showSearch
+                            ? CafeTheme.primaryGold
+                            : CafeTheme.warmBrown.withValues(alpha: 0.3),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.search_rounded,
+                          color: _showSearch
+                              ? CafeTheme.primaryGold
+                              : Colors.white54,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          "بحث",
+                          style: TextStyle(
+                            color: _showSearch
+                                ? CafeTheme.primaryGold
+                                : Colors.white54,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // ✦ ميزة 2: زرار المفضلة
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _showFavoritesOnly = !_showFavoritesOnly;
+                    });
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _showFavoritesOnly
+                          ? Colors.red.withValues(alpha: 0.2)
+                          : Colors.white.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: _showFavoritesOnly
+                            ? Colors.redAccent
+                            : CafeTheme.warmBrown.withValues(alpha: 0.3),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _showFavoritesOnly
+                              ? Icons.favorite_rounded
+                              : Icons.favorite_border_rounded,
+                          color: _showFavoritesOnly
+                              ? Colors.redAccent
+                              : Colors.white54,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          "المفضلة",
+                          style: TextStyle(
+                            color: _showFavoritesOnly
+                                ? Colors.redAccent
+                                : Colors.white54,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (_favorites.isNotEmpty) ...[
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.redAccent,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              "${_favorites.length}",
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                // ✦ ميزة 4: تبديل العرض Grid/List
+                GestureDetector(
+                  onTap: () {
+                    setState(() => _isGridView = !_isGridView);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: CafeTheme.warmBrown.withValues(alpha: 0.3),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Icon(
+                      _isGridView
+                          ? Icons.view_list_rounded
+                          : Icons.grid_view_rounded,
+                      color: CafeTheme.primaryGold,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            // حقل البحث
+            AnimatedSize(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              child: _showSearch
+                  ? Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: TextField(
+                        controller: _searchController,
+                        autofocus: true,
+                        onChanged: (v) => setState(() => _searchQuery = v),
+                        style: const TextStyle(color: Colors.white),
+                        textAlign: TextAlign.right,
+                        decoration: InputDecoration(
+                          hintText: "ابحث عن أي صنف...",
+                          hintStyle: const TextStyle(
+                              color: Colors.white38, fontSize: 13),
+                          prefixIcon: const Icon(Icons.search_rounded,
+                              color: CafeTheme.primaryGold, size: 20),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _searchQuery = "";
+                                      _searchController.clear();
+                                    });
+                                  },
+                                  child: const Icon(Icons.close_rounded,
+                                      color: Colors.white38, size: 18),
+                                )
+                              : null,
+                          filled: true,
+                          fillColor: Colors.white.withValues(alpha: 0.06),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 14),
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildBestSellers() {
     return SliverToBoxAdapter(
       child: Column(
@@ -791,7 +1227,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 Container(
                   width: 3,
                   height: 18,
-                  decoration: const BoxDecoration(gradient: CafeTheme.goldGradient),
+                  decoration:
+                      const BoxDecoration(gradient: CafeTheme.goldGradient),
                 ),
                 const SizedBox(width: 10),
                 const Text(
@@ -827,6 +1264,13 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                     bool hasImage = imgUrl != null && imgUrl.isNotEmpty;
                     bool hasSizes = item['sizes'] != null &&
                         (item['sizes'] as List).isNotEmpty;
+                    // ✦ ميزة 3: عداد الكميات
+                    String itemName = item['name'] ?? '';
+                    int qtyInBasket = basket
+                        .where(
+                            (e) => (e['name'] as String).startsWith(itemName))
+                        .fold(0, (s, e) => s + (e['quantity'] as int));
+
                     return GestureDetector(
                       onTap: () => _showAddDialog(item),
                       child: Container(
@@ -840,134 +1284,203 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                             end: Alignment.bottomRight,
                           ),
                           border: Border.all(
-                            color: CafeTheme.primaryGold.withValues(alpha: 0.35),
-                            width: 1.2,
+                            color: qtyInBasket > 0
+                                ? CafeTheme.primaryGold
+                                : CafeTheme.primaryGold.withValues(alpha: 0.35),
+                            width: qtyInBasket > 0 ? 2 : 1.2,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: CafeTheme.primaryGold.withValues(alpha: 0.12),
+                              color:
+                                  CafeTheme.primaryGold.withValues(alpha: 0.12),
                               blurRadius: 14,
                               offset: const Offset(0, 5),
                             ),
                           ],
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                        child: Stack(
                           children: [
-                            // صورة أو placeholder أنيق
-                            Expanded(
-                              flex: 6,
-                              child: ClipRRect(
-                                borderRadius: const BorderRadius.vertical(
-                                    top: Radius.circular(24)),
-                                child: Stack(
-                                  fit: StackFit.expand,
-                                  children: [
-                                    hasImage
-                                        ? Image.network(
-                                            imgUrl!,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (c, e, s) =>
-                                                _bestSellerPlaceholder(
-                                                    item['name'] ?? ""),
-                                          )
-                                        : _bestSellerPlaceholder(
-                                            item['name'] ?? ""),
-                                    // gradient overlay
-                                    Positioned.fill(
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            colors: [
-                                              Colors.transparent,
-                                              Colors.black
-                                                  .withValues(alpha: 0.55),
-                                            ],
-                                            begin: Alignment.topCenter,
-                                            end: Alignment.bottomCenter,
-                                            stops: const [0.55, 1.0],
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Expanded(
+                                  flex: 6,
+                                  child: ClipRRect(
+                                    borderRadius: const BorderRadius.vertical(
+                                        top: Radius.circular(24)),
+                                    child: Stack(
+                                      fit: StackFit.expand,
+                                      children: [
+                                        hasImage
+                                            ? Image.network(
+                                                imgUrl!,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (c, e, s) =>
+                                                    _bestSellerPlaceholder(
+                                                        item['name'] ?? ""),
+                                              )
+                                            : _bestSellerPlaceholder(
+                                                item['name'] ?? ""),
+                                        Positioned.fill(
+                                          child: Container(
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                colors: [
+                                                  Colors.transparent,
+                                                  Colors.black
+                                                      .withValues(alpha: 0.55),
+                                                ],
+                                                begin: Alignment.topCenter,
+                                                end: Alignment.bottomCenter,
+                                                stops: const [0.55, 1.0],
+                                              ),
+                                            ),
                                           ),
                                         ),
+                                        Positioned(
+                                          top: 8,
+                                          right: 8,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: CafeTheme.deepBrown
+                                                  .withValues(alpha: 0.9),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              border: Border.all(
+                                                color: CafeTheme.primaryGold
+                                                    .withValues(alpha: 0.6),
+                                                width: 0.8,
+                                              ),
+                                            ),
+                                            child: Text(
+                                              hasSizes
+                                                  ? "✦ أحجام"
+                                                  : "${item['price'] ?? '—'} ج",
+                                              style: const TextStyle(
+                                                color: CafeTheme.primaryGold,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        // ✦ ميزة 2: زرار المفضلة
+                                        Positioned(
+                                          top: 8,
+                                          left: 8,
+                                          child: GestureDetector(
+                                            onTap: () {
+                                              setState(() {
+                                                if (_favorites
+                                                    .contains(itemName)) {
+                                                  _favorites.remove(itemName);
+                                                } else {
+                                                  _favorites.add(itemName);
+                                                }
+                                              });
+                                            },
+                                            child: Container(
+                                              width: 28,
+                                              height: 28,
+                                              decoration: BoxDecoration(
+                                                color: Colors.black
+                                                    .withValues(alpha: 0.5),
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: Icon(
+                                                _favorites.contains(itemName)
+                                                    ? Icons.favorite_rounded
+                                                    : Icons
+                                                        .favorite_border_rounded,
+                                                color: _favorites
+                                                        .contains(itemName)
+                                                    ? Colors.redAccent
+                                                    : Colors.white54,
+                                                size: 16,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  flex: 3,
+                                  child: Padding(
+                                    padding:
+                                        const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            item['name'] ?? "",
+                                            style: const TextStyle(
+                                              color: CafeTheme.primaryGoldLight,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              height: 1.2,
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          width: 30,
+                                          height: 30,
+                                          decoration: BoxDecoration(
+                                            gradient: const LinearGradient(
+                                              colors: [
+                                                CafeTheme.primaryGold,
+                                                CafeTheme.warmBrown
+                                              ],
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                            ),
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                          ),
+                                          child: const Icon(Icons.add_rounded,
+                                              color: Colors.black, size: 18),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            // ✦ ميزة 3: عداد الكميات على الكارد
+                            if (qtyInBasket > 0)
+                              Positioned(
+                                top: 0,
+                                left: 0,
+                                child: Container(
+                                  width: 26,
+                                  height: 26,
+                                  decoration: BoxDecoration(
+                                    color: CafeTheme.primaryGold,
+                                    borderRadius: const BorderRadius.only(
+                                      topLeft: Radius.circular(24),
+                                      bottomRight: Radius.circular(12),
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      "$qtyInBasket",
+                                      style: const TextStyle(
+                                        color: Colors.black,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
                                       ),
                                     ),
-                                    // بادج السعر أو الأحجام
-                                    Positioned(
-                                      top: 8,
-                                      right: 8,
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 8, vertical: 3),
-                                        decoration: BoxDecoration(
-                                          color: CafeTheme.deepBrown
-                                              .withValues(alpha: 0.9),
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                          border: Border.all(
-                                            color: CafeTheme.primaryGold
-                                                .withValues(alpha: 0.6),
-                                            width: 0.8,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          hasSizes
-                                              ? "✦ أحجام"
-                                              : "${item['price']} ج",
-                                          style: const TextStyle(
-                                            color: CafeTheme.primaryGold,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                                  ),
                                 ),
                               ),
-                            ),
-                            // اسم المنتج وزرار إضافة
-                            Expanded(
-                              flex: 3,
-                              child: Padding(
-                                padding:
-                                    const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        item['name'] ?? "",
-                                        style: const TextStyle(
-                                          color: CafeTheme.primaryGoldLight,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                          height: 1.2,
-                                        ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Container(
-                                      width: 30,
-                                      height: 30,
-                                      decoration: BoxDecoration(
-                                        gradient: const LinearGradient(
-                                          colors: [
-                                            CafeTheme.primaryGold,
-                                            CafeTheme.warmBrown
-                                          ],
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                        ),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: const Icon(Icons.add_rounded,
-                                          color: Colors.black, size: 18),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
                           ],
                         ),
                       ),
@@ -1011,12 +1524,13 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           .orderBy('index')
           .snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData)
+        if (!snapshot.hasData) {
           return const SliverToBoxAdapter(child: SizedBox());
+        }
         var cats = snapshot.data!.docs;
         if (currentCat == null && cats.isNotEmpty) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            setState(() => currentCat = cats.first['name']);
+            if (mounted) setState(() => currentCat = cats.first['name']);
           });
         }
         return SliverToBoxAdapter(
@@ -1028,16 +1542,12 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                // نضيف عنصر إضافي في الأول لزرار "الكل"
                 itemCount: cats.length + 1,
                 itemBuilder: (context, index) {
-                  // زرار "كل الأقسام" في الأول
                   if (index == 0) {
-                    bool isAll = currentCat == null || currentCat == "__all__";
+                    bool isAllSelected = currentCat == "__all__";
                     return GestureDetector(
-                      onTap: () => setState(() => currentCat = cats.isNotEmpty
-                          ? cats.first['name']
-                          : null),
+                      onTap: () => setState(() => currentCat = "__all__"),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 280),
                         curve: Curves.easeInOut,
@@ -1045,14 +1555,23 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 18, vertical: 10),
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [
-                              Color(0xFF3A2010),
-                              Color(0xFF1E0F05),
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
+                          gradient: isAllSelected
+                              ? const LinearGradient(
+                                  colors: [
+                                    CafeTheme.primaryGold,
+                                    CafeTheme.warmBrown
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                )
+                              : const LinearGradient(
+                                  colors: [
+                                    Color(0xFF3A2010),
+                                    Color(0xFF1E0F05),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
                           borderRadius: BorderRadius.circular(30),
                           border: Border.all(
                             color: CafeTheme.primaryGold.withValues(alpha: 0.5),
@@ -1060,7 +1579,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: CafeTheme.primaryGold.withValues(alpha: 0.2),
+                              color:
+                                  CafeTheme.primaryGold.withValues(alpha: 0.2),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
                             ),
@@ -1071,14 +1591,18 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                           children: [
                             Icon(
                               Icons.grid_view_rounded,
-                              color: CafeTheme.primaryGold,
+                              color: isAllSelected
+                                  ? Colors.black87
+                                  : CafeTheme.primaryGold,
                               size: 15,
                             ),
                             const SizedBox(width: 6),
-                            const Text(
+                            Text(
                               "كل الأقسام",
                               style: TextStyle(
-                                color: CafeTheme.primaryGold,
+                                color: isAllSelected
+                                    ? Colors.black87
+                                    : CafeTheme.primaryGold,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: 0.3,
@@ -1089,7 +1613,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                       ),
                     );
                   }
-                  // باقي الأقسام
                   String catName = cats[index - 1]['name'] ?? "";
                   bool isSelected = currentCat == catName;
                   return GestureDetector(
@@ -1139,17 +1662,15 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                             CategoryIcons.resolve(catName),
                             color: isSelected
                                 ? Colors.black87
-                                : CafeTheme.primaryGold
-                                    .withValues(alpha: 0.6),
+                                : CafeTheme.primaryGold.withValues(alpha: 0.6),
                             size: 15,
                           ),
                           const SizedBox(width: 6),
                           Text(
                             catName,
                             style: TextStyle(
-                              color: isSelected
-                                  ? Colors.black87
-                                  : Colors.white60,
+                              color:
+                                  isSelected ? Colors.black87 : Colors.white60,
                               fontSize: 13,
                               fontWeight: isSelected
                                   ? FontWeight.w800
@@ -1183,7 +1704,13 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             ),
             const SizedBox(width: 10),
             Text(
-              currentCat ?? "",
+              _showFavoritesOnly
+                  ? "❤️ المفضلة"
+                  : _searchQuery.isNotEmpty
+                      ? "🔍 نتائج البحث"
+                      : (currentCat == "__all__"
+                          ? "كل الأقسام"
+                          : (currentCat ?? "")),
               style: const TextStyle(
                 color: CafeTheme.primaryGoldLight,
                 fontSize: 15,
@@ -1203,12 +1730,21 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     );
   }
 
+  // ==========================================
+  // ✦ ميزة 4: Products Grid / List view
+  // ==========================================
   Widget _buildProductsGrid() {
+    final Stream<QuerySnapshot> stream = (currentCat == "__all__" ||
+            _searchQuery.isNotEmpty ||
+            _showFavoritesOnly)
+        ? FirebaseFirestore.instance.collection('products').snapshots()
+        : FirebaseFirestore.instance
+            .collection('products')
+            .where('cat', isEqualTo: currentCat)
+            .snapshots();
+
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('products')
-          .where('cat', isEqualTo: currentCat)
-          .snapshots(),
+      stream: stream,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const SliverToBoxAdapter(
@@ -1217,128 +1753,85 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             ),
           );
         }
-        var items = snapshot.data!.docs;
+
+        var allItems = snapshot.data!.docs;
+
+        // فلترة البحث
+        if (_searchQuery.isNotEmpty) {
+          allItems = allItems.where((doc) {
+            var d = doc.data() as Map<String, dynamic>;
+            return (d['name'] ?? '').toString().toLowerCase().contains(
+                  _searchQuery.toLowerCase(),
+                );
+          }).toList();
+        }
+
+        // فلترة المفضلة
+        if (_showFavoritesOnly) {
+          allItems = allItems.where((doc) {
+            var d = doc.data() as Map<String, dynamic>;
+            return _favorites.contains(d['name'] ?? '');
+          }).toList();
+        }
+
+        if (allItems.isEmpty) {
+          return SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(40),
+              child: Column(
+                children: [
+                  Icon(
+                    _showFavoritesOnly
+                        ? Icons.favorite_border_rounded
+                        : Icons.search_off_rounded,
+                    color: Colors.white24,
+                    size: 50,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    _showFavoritesOnly
+                        ? "لا توجد أصناف في المفضلة بعد"
+                        : "لا توجد نتائج للبحث",
+                    style: const TextStyle(color: Colors.white38, fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // ✦ Grid View
+        if (_isGridView) {
+          return SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            sliver: SliverGrid(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                childAspectRatio: 0.82,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  var item = allItems[index].data() as Map<String, dynamic>;
+                  return _buildGridCard(item);
+                },
+                childCount: allItems.length,
+              ),
+            ),
+          );
+        }
+
+        // ✦ List View (الافتراضي)
         return SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           sliver: SliverList(
             delegate: SliverChildBuilderDelegate(
               (context, index) {
-                var item = items[index].data() as Map<String, dynamic>;
-                String? imgUrl = item['image_url'];
-                bool hasImage = imgUrl != null && imgUrl.isNotEmpty;
-                bool hasSizes =
-                    item['sizes'] != null && (item['sizes'] as List).isNotEmpty;
-
-                return GestureDetector(
-                  onTap: () => _showAddDialog(item),
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    height: 90,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A0F05),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: CafeTheme.warmBrown.withValues(alpha: 0.28),
-                        width: 1,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.35),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        // صورة المنتج (فقط لو في صورة حقيقية)
-                        if (hasImage)
-                          ClipRRect(
-                            borderRadius: const BorderRadius.horizontal(
-                              left: Radius.circular(18),
-                            ),
-                            child: SizedBox(
-                              width: 90,
-                              height: 90,
-                              child: Image.network(
-                                imgUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    const SizedBox.shrink(),
-                              ),
-                            ),
-                          ),
-                        // المحتوى النصي
-                        Expanded(
-                          child: Padding(
-                            padding: EdgeInsets.fromLTRB(
-                              hasImage ? 14 : 18,
-                              12,
-                              14,
-                              12,
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  item['name'] ?? "",
-                                  style: const TextStyle(
-                                    color: CafeTheme.primaryGoldLight,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    height: 1.3,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  hasSizes
-                                      ? "✦ متعدد الأحجام"
-                                      : "${item['price']} ج.م",
-                                  style: TextStyle(
-                                    color: CafeTheme.primaryGold
-                                        .withValues(alpha: 0.85),
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        // زرار الإضافة
-                        Padding(
-                          padding: const EdgeInsets.only(left: 14),
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [
-                                  CafeTheme.primaryGold,
-                                  CafeTheme.warmBrown
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(
-                              Icons.add_rounded,
-                              color: Colors.black,
-                              size: 22,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                      ],
-                    ),
-                  ),
-                );
+                var item = allItems[index].data() as Map<String, dynamic>;
+                return _buildListCard(item);
               },
-              childCount: items.length,
+              childCount: allItems.length,
             ),
           ),
         );
@@ -1346,16 +1839,358 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     );
   }
 
+  // كارد القائمة (List)
+  Widget _buildListCard(Map<String, dynamic> item) {
+    String? imgUrl = item['image_url'];
+    bool hasImage = imgUrl != null && imgUrl.isNotEmpty;
+    bool hasSizes = item['sizes'] != null && (item['sizes'] as List).isNotEmpty;
+    String itemName = item['name'] ?? '';
+    bool isFav = _favorites.contains(itemName);
+    // ✦ ميزة 3: عداد الكميات
+    int qtyInBasket = basket
+        .where((e) => (e['name'] as String).startsWith(itemName))
+        .fold(0, (s, e) => s + (e['quantity'] as int));
+
+    return GestureDetector(
+      onTap: () => _showAddDialog(item),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        height: 90,
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A0F05),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: qtyInBasket > 0
+                ? CafeTheme.primaryGold
+                : CafeTheme.warmBrown.withValues(alpha: 0.28),
+            width: qtyInBasket > 0 ? 1.8 : 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.35),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // صورة
+            if (hasImage)
+              ClipRRect(
+                borderRadius: const BorderRadius.horizontal(
+                  left: Radius.circular(18),
+                ),
+                child: SizedBox(
+                  width: 90,
+                  height: 90,
+                  child: Image.network(
+                    imgUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const SizedBox.shrink(),
+                  ),
+                ),
+              ),
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  hasImage ? 14 : 18,
+                  12,
+                  14,
+                  12,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      itemName,
+                      style: const TextStyle(
+                        color: CafeTheme.primaryGoldLight,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        height: 1.3,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Text(
+                          hasSizes
+                              ? "✦ متعدد الأحجام"
+                              : "${item['price'] ?? '—'} ج.م",
+                          style: TextStyle(
+                            color:
+                                CafeTheme.primaryGold.withValues(alpha: 0.85),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        // ✦ ميزة 3: عداد الكميات
+                        if (qtyInBasket > 0) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: CafeTheme.primaryGold,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              "في السلة: $qtyInBasket",
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // زرار المفضلة
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  if (isFav) {
+                    _favorites.remove(itemName);
+                  } else {
+                    _favorites.add(itemName);
+                  }
+                });
+              },
+              child: Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: Icon(
+                  isFav
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  color: isFav ? Colors.redAccent : Colors.white24,
+                  size: 20,
+                ),
+              ),
+            ),
+            // زرار الإضافة
+            Padding(
+              padding: const EdgeInsets.only(left: 14),
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [CafeTheme.primaryGold, CafeTheme.warmBrown],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.add_rounded,
+                  color: Colors.black,
+                  size: 22,
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // كارد الشبكة (Grid)
+  Widget _buildGridCard(Map<String, dynamic> item) {
+    String? imgUrl = item['image_url'];
+    bool hasImage = imgUrl != null && imgUrl.isNotEmpty;
+    bool hasSizes = item['sizes'] != null && (item['sizes'] as List).isNotEmpty;
+    String itemName = item['name'] ?? '';
+    bool isFav = _favorites.contains(itemName);
+    int qtyInBasket = basket
+        .where((e) => (e['name'] as String).startsWith(itemName))
+        .fold(0, (s, e) => s + (e['quantity'] as int));
+
+    return GestureDetector(
+      onTap: () => _showAddDialog(item),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF2A1608), Color(0xFF160D03)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          border: Border.all(
+            color: qtyInBasket > 0
+                ? CafeTheme.primaryGold
+                : CafeTheme.primaryGold.withValues(alpha: 0.3),
+            width: qtyInBasket > 0 ? 2 : 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: CafeTheme.primaryGold.withValues(alpha: 0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  flex: 6,
+                  child: ClipRRect(
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(22)),
+                    child: hasImage
+                        ? Image.network(
+                            imgUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (c, e, s) =>
+                                _bestSellerPlaceholder(itemName),
+                          )
+                        : _bestSellerPlaceholder(itemName),
+                  ),
+                ),
+                Expanded(
+                  flex: 4,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          itemName,
+                          style: const TextStyle(
+                            color: CafeTheme.primaryGoldLight,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              hasSizes
+                                  ? "✦ أحجام"
+                                  : "${item['price'] ?? '—'} ج",
+                              style: const TextStyle(
+                                color: CafeTheme.primaryGold,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    CafeTheme.primaryGold,
+                                    CafeTheme.warmBrown
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(9),
+                              ),
+                              child: const Icon(Icons.add_rounded,
+                                  color: Colors.black, size: 18),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            // ✦ ميزة 2: زرار المفضلة
+            Positioned(
+              top: 8,
+              left: 8,
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    if (isFav) {
+                      _favorites.remove(itemName);
+                    } else {
+                      _favorites.add(itemName);
+                    }
+                  });
+                },
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.55),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isFav
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    color: isFav ? Colors.redAccent : Colors.white54,
+                    size: 16,
+                  ),
+                ),
+              ),
+            ),
+            // ✦ ميزة 3: عداد الكميات
+            if (qtyInBasket > 0)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: CafeTheme.primaryGold,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    "$qtyInBasket",
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showAddDialog(Map<String, dynamic> item) {
     _noteController.clear();
 
+    // ✅ إصلاح: null safety للسعر
     List<dynamic>? sizes = item['sizes'];
     Map<String, dynamic>? selectedSize;
-    double currentPrice = (item['price'] as num).toDouble();
+    double currentPrice = 0.0;
 
-    if (sizes != null && sizes.isNotEmpty) {
-      selectedSize = sizes.first;
-      currentPrice = (selectedSize!['price'] as num).toDouble();
+    try {
+      if (sizes != null && sizes.isNotEmpty) {
+        selectedSize = sizes.first as Map<String, dynamic>;
+        currentPrice = (selectedSize['price'] as num).toDouble();
+      } else if (item['price'] != null) {
+        currentPrice = (item['price'] as num).toDouble();
+      }
+    } catch (e) {
+      currentPrice = 0.0;
+      debugPrint("Price parse error: $e");
     }
 
     showDialog(
@@ -1366,7 +2201,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             return AlertDialog(
               backgroundColor: const Color(0xFF1A1008),
               title: Text(
-                "تخصيص ${item['name']}",
+                "تخصيص ${item['name'] ?? ''}",
                 textAlign: TextAlign.right,
                 style: const TextStyle(color: CafeTheme.primaryGold),
               ),
@@ -1402,7 +2237,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                           onSelected: (bool selected) {
                             if (selected) {
                               setDialogState(() {
-                                selectedSize = s;
+                                selectedSize = s as Map<String, dynamic>;
                                 currentPrice = (s['price'] as num).toDouble();
                               });
                             }
@@ -1446,7 +2281,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                           ? "بدون إضافات"
                           : _noteController.text;
 
-                      String itemName = item['name'];
+                      String itemName = item['name'] ?? '';
                       if (selectedSize != null) {
                         itemName += " (${selectedSize!['name']})";
                       }
@@ -1504,7 +2339,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
-              border: Border(
+              border: const Border(
                 top: BorderSide(color: CafeTheme.warmBrown, width: 1.5),
               ),
             ),
@@ -1738,9 +2573,11 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 ),
               ),
             ),
-            child: const Text(
-              "تأكيد الطلب ⚡",
-              style: TextStyle(
+            child: Text(
+              _basketItemCount > 0
+                  ? "تأكيد الطلب ($_basketItemCount) ⚡"
+                  : "تأكيد الطلب ⚡",
+              style: const TextStyle(
                 color: CafeTheme.primaryGoldLight,
                 fontWeight: FontWeight.w900,
                 fontSize: 16,
@@ -1788,12 +2625,166 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     setState(() {
       basket.clear();
     });
-    _showStatusSnackBar("تم إرسال طلبك! 🚀", Colors.greenAccent);
+
+    // ✦ ميزة 5: تقييم سريع بعد الطلب
+    _showRatingDialog();
   }
 
   // ==========================================
-  // تغيير الطاولة
+  // ✦ ميزة 5: تقييم سريع بعد الطلب
   // ==========================================
+  void _showRatingDialog() {
+    int selectedRating = 0;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setRatingState) => BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Dialog(
+            backgroundColor: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1A1008), Color(0xFF0D0904)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(
+                  color: CafeTheme.primaryGold.withValues(alpha: 0.4),
+                  width: 1.5,
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    "تم إرسال طلبك! 🎉",
+                    style: TextStyle(
+                      color: CafeTheme.primaryGold,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    "كيف كانت تجربتك معنا؟",
+                    style: TextStyle(
+                      color: Colors.white60,
+                      fontSize: 13,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (i) {
+                      return GestureDetector(
+                        onTap: () {
+                          setRatingState(() => selectedRating = i + 1);
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Icon(
+                            i < selectedRating
+                                ? Icons.star_rounded
+                                : Icons.star_border_rounded,
+                            color: i < selectedRating
+                                ? CafeTheme.primaryGold
+                                : Colors.white30,
+                            size: 40,
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 20),
+                  if (selectedRating > 0)
+                    Text(
+                      selectedRating == 5
+                          ? "ممتاز! شكراً على ثقتك ✨"
+                          : selectedRating >= 3
+                              ? "شكراً! رأيك يفيدنا كثيراً"
+                              : "آسفين على ذلك! سنتحسن 🙏",
+                      style: TextStyle(
+                        color: selectedRating >= 4
+                            ? Colors.greenAccent
+                            : selectedRating >= 3
+                                ? CafeTheme.primaryGold
+                                : Colors.orangeAccent,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text(
+                            "تخطي",
+                            style: TextStyle(color: Colors.white38),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: CafeTheme.primaryGold,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          onPressed: selectedRating == 0
+                              ? null
+                              : () async {
+                                  Navigator.pop(context);
+                                  // حفظ التقييم في Firestore
+                                  try {
+                                    await FirebaseFirestore.instance
+                                        .collection('ratings')
+                                        .add({
+                                      'customer': registeredName,
+                                      'table': currentTable,
+                                      'rating': selectedRating,
+                                      'timestamp': FieldValue.serverTimestamp(),
+                                    });
+                                  } catch (e) {
+                                    debugPrint("Rating save error: $e");
+                                  }
+                                  if (mounted) {
+                                    _showStatusSnackBar(
+                                      "شكراً على تقييمك! ⭐",
+                                      CafeTheme.primaryGold,
+                                    );
+                                  }
+                                },
+                          child: const Text(
+                            "إرسال",
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showChangeTableDialog() {
     final tableCtrl = TextEditingController(text: currentTable);
     showDialog(
@@ -1859,7 +2850,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("إلغاء", style: TextStyle(color: Colors.white38)),
+              child:
+                  const Text("إلغاء", style: TextStyle(color: Colors.white38)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -1895,10 +2887,11 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   }
 
   // ==========================================
-  // ✦ الإضافة الأولى: بانر ترحيبي ذكي يختفي تلقائياً
+  // ✦ بانر ترحيبي ذكي
   // ==========================================
   Widget _buildWelcomeBanner() {
-    if (registeredName == null) return const SizedBox();
+    if (registeredName == null)
+      return const SliverToBoxAdapter(child: SizedBox());
     return SliverToBoxAdapter(
       child: Container(
         margin: const EdgeInsets.fromLTRB(18, 18, 18, 0),
@@ -1928,8 +2921,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 ),
                 borderRadius: BorderRadius.circular(13),
               ),
-              child:
-                  const Icon(Icons.waving_hand_rounded, color: Colors.black, size: 22),
+              child: const Icon(Icons.waving_hand_rounded,
+                  color: Colors.black, size: 22),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -1958,7 +2951,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   }
 
   // ==========================================
-  // ✦ الإضافة الثانية: شريط "توقيت المطبخ" - وقت الذروة
+  // ✦ شريط توقيت المطبخ
   // ==========================================
   Widget _buildKitchenStatusBanner() {
     final hour = DateTime.now().hour;
@@ -1976,12 +2969,12 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             width: 1,
           ),
         ),
-        child: Row(
+        child: const Row(
           children: [
-            const Icon(Icons.local_fire_department_rounded,
+            Icon(Icons.local_fire_department_rounded,
                 color: Colors.orangeAccent, size: 18),
-            const SizedBox(width: 10),
-            const Expanded(
+            SizedBox(width: 10),
+            Expanded(
               child: Text(
                 "وقت الذروة 🔥 ممكن يتأخر التجهيز شوية — شكراً لصبرك!",
                 style: TextStyle(
@@ -1998,7 +2991,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   }
 
   // ==========================================
-  // ✦ الإضافة الثالثة: قسم "اقتراح اليوم" Premium
+  // ✦ اقتراح اليوم Premium
   // ==========================================
   Widget _buildDailySpecial() {
     final dayOfWeek = DateTime.now().weekday;
@@ -2084,13 +3077,13 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   }
 
   // ==========================================
-  // ✦ الإضافة الرابعة: Floating Basket Counter مصغر
+  // ✦ عداد السلة
   // ==========================================
   int get _basketItemCount =>
-      basket.fold(0, (sum, item) => sum + (item['quantity'] as int));
+      basket.fold(0, (acc, item) => acc + (item['quantity'] as int));
 
   // ==========================================
-  // ✦ الإضافة الخامسة: تحية الوقت في AppBar
+  // ✦ تحية الوقت
   // ==========================================
   String get _timeGreeting {
     final hour = DateTime.now().hour;
@@ -2146,6 +3139,15 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
     _initWaiterAlerts();
   }
 
+  @override
+  void dispose() {
+    tableCtrl.dispose();
+    nameCtrl.dispose();
+    searchCtrl.dispose();
+    noteCtrl.dispose();
+    super.dispose();
+  }
+
   void _playSound(String url) {
     debugPrint("Playing sound in WaiterTerminal: $url");
   }
@@ -2191,11 +3193,18 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
 
     List<dynamic>? sizes = item['sizes'];
     Map<String, dynamic>? selectedSize;
-    double currentPrice = (item['price'] as num).toDouble();
+    double currentPrice = 0.0;
 
-    if (sizes != null && sizes.isNotEmpty) {
-      selectedSize = sizes.first;
-      currentPrice = (selectedSize!['price'] as num).toDouble();
+    try {
+      if (sizes != null && sizes.isNotEmpty) {
+        selectedSize = sizes.first as Map<String, dynamic>;
+        currentPrice = (selectedSize['price'] as num).toDouble();
+      } else if (item['price'] != null) {
+        currentPrice = (item['price'] as num).toDouble();
+      }
+    } catch (e) {
+      currentPrice = 0.0;
+      debugPrint("Waiter price parse error: $e");
     }
 
     showDialog(
@@ -2206,7 +3215,7 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
             return AlertDialog(
               backgroundColor: const Color(0xFF1A1008),
               title: Text(
-                "إضافة ${item['name']}",
+                "إضافة ${item['name'] ?? ''}",
                 textAlign: TextAlign.right,
                 style: const TextStyle(color: CafeTheme.primaryGold),
               ),
@@ -2242,7 +3251,7 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                           onSelected: (bool selected) {
                             if (selected) {
                               setDialogState(() {
-                                selectedSize = s;
+                                selectedSize = s as Map<String, dynamic>;
                                 currentPrice = (s['price'] as num).toDouble();
                               });
                             }
@@ -2286,7 +3295,7 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                           ? "بدون ملاحظات"
                           : noteCtrl.text;
 
-                      String itemName = item['name'];
+                      String itemName = item['name'] ?? '';
                       if (selectedSize != null) {
                         itemName += " (${selectedSize!['name']})";
                       }
@@ -2382,6 +3391,7 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
   }
 
   void _showSnack(String msg, Color color) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -2453,30 +3463,24 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: searchCtrl,
-                  onChanged: (v) => setState(() => searchQuery = v),
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: "ابحث عن منتج...",
-                    hintStyle: const TextStyle(color: Colors.white38),
-                    prefixIcon: const Icon(
-                      Icons.search,
-                      color: CafeTheme.primaryGold,
-                    ),
-                    filled: true,
-                    fillColor: Colors.white.withValues(alpha: 0.05),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(15),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
+          child: TextField(
+            controller: searchCtrl,
+            onChanged: (v) => setState(() => searchQuery = v),
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: "ابحث عن منتج...",
+              hintStyle: const TextStyle(color: Colors.white38),
+              prefixIcon: const Icon(
+                Icons.search,
+                color: CafeTheme.primaryGold,
               ),
-            ],
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: 0.05),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(15),
+                borderSide: BorderSide.none,
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 10),
@@ -2529,10 +3533,12 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
         const SizedBox(height: 10),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('products')
-                .where('cat', isEqualTo: selectedCategory)
-                .snapshots(),
+            stream: selectedCategory != null
+                ? FirebaseFirestore.instance
+                    .collection('products')
+                    .where('cat', isEqualTo: selectedCategory)
+                    .snapshots()
+                : FirebaseFirestore.instance.collection('products').snapshots(),
             builder: (context, snapshot) {
               if (!snapshot.hasData) {
                 return const Center(
@@ -2581,6 +3587,11 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                                     width: 55,
                                     height: 55,
                                     fit: BoxFit.cover,
+                                    errorBuilder: (c, e, s) => const Icon(
+                                      Icons.fastfood,
+                                      color: CafeTheme.primaryGold,
+                                      size: 40,
+                                    ),
                                   )
                                 : const Icon(
                                     Icons.fastfood,
@@ -2594,7 +3605,7 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                               horizontal: 4.0,
                             ),
                             child: Text(
-                              prod['name'],
+                              prod['name'] ?? '',
                               textAlign: TextAlign.center,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
@@ -2607,7 +3618,9 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                           ),
                           const SizedBox(height: 5),
                           Text(
-                            hasSizes ? "أحجام مختلفة" : "${prod['price']} ج.م",
+                            hasSizes
+                                ? "أحجام مختلفة"
+                                : "${prod['price'] ?? '—'} ج.م",
                             style: TextStyle(
                               color: hasSizes
                                   ? Colors.orangeAccent
