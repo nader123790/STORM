@@ -9,7 +9,7 @@ import 'dart:js' as js;
 import 'dart:html' as html;
 
 import 'firebase_options.dart';
-import 'api_service.dart';
+import 'services/api_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
