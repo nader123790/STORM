@@ -1,15 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:ui';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:js' as js;
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
 
 import 'firebase_options.dart';
 import 'services/api_service.dart';
+
+// Utility class for Category Icons since we cannot import external non-standard files
+class CategoryIcons {
+  static IconData resolve(String name) {
+    if (name.contains("قهوة") ||
+        name.contains("اسبريسو") ||
+        name.contains("كوفي")) {
+      return Icons.coffee_rounded;
+    } else if (name.contains("عصير") ||
+        name.contains("موهيتو") ||
+        name.contains("مشروب")) {
+      return Icons.local_drink_rounded;
+    } else if (name.contains("حلى") ||
+        name.contains("كيك") ||
+        name.contains("ديزرت")) {
+      return Icons.cake_rounded;
+    } else if (name.contains("شاي")) {
+      return Icons.emoji_food_beverage_rounded;
+    } else if (name.contains("ساندوتش") ||
+        name.contains("طعام") ||
+        name.contains("أكل")) {
+      return Icons.lunch_dining_rounded;
+    }
+    return Icons.local_cafe_rounded;
+  }
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,15 +45,13 @@ void main() async {
 }
 
 class CafeTheme {
-  // Storm Logo Colors
-  static const Color primaryGold = Color(0xFFC8A96E); // ذهبي/بيج من اللوجو
-  static const Color primaryGoldLight = Color(0xFFE8D5B0); // بيج فاتح
-  static const Color warmBrown = Color(0xFF7B4A1E); // بني متوسط
-  static const Color deepBrown = Color(0xFF5C2F0A); // بني داكن
-  static const Color darkBg = Color(0xFF0A0A0A); // أسود دافئ
-  static const Color surface = Color(0xFF1A1008); // سطح بني-أسود
-  static const Color surfaceLight = Color(0xFF2A1A0A); // سطح أفتح
-  static const Color accentGreen = Color(0xFF4CAF50);
+  static const Color primaryGold = Color(0xFFC8A96E);
+  static const Color primaryGoldLight = Color(0xFFE8D5B0);
+  static const Color warmBrown = Color(0xFF7B4A1E);
+  static const Color deepBrown = Color(0xFF5C2F0A);
+  static const Color darkBg = Color(0xFF0A0600);
+  static const Color surface = Color(0xFF1A1008);
+  static const Color surfaceLight = Color(0xFF2A1A0A);
 
   static const LinearGradient goldGradient = LinearGradient(
     colors: [Color(0xFFC8A96E), Color(0xFF7B4A1E)],
@@ -101,18 +120,15 @@ class MenuPage extends StatefulWidget {
 
 class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   String? currentCat;
-  final TextEditingController _catSearchCtrl = TextEditingController();
   List<Map<String, dynamic>> basket = [];
   String? registeredName;
   String? currentTable;
 
   bool _isEntryComplete = false;
-  bool _hasSavedName = false;
   bool _isWaiterAlertActive = false;
 
   late AnimationController _glowController;
   late AnimationController _devPulseController;
-  late AnimationController _changeTablePulseController;
 
   final TextEditingController _noteController = TextEditingController();
   final TextEditingController _nameEntryController = TextEditingController();
@@ -130,183 +146,24 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
-
-    _changeTablePulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
-
-    _checkSavedData();
   }
 
   @override
   void dispose() {
     _glowController.dispose();
     _devPulseController.dispose();
-    _changeTablePulseController.dispose();
+    _noteController.dispose();
+    _nameEntryController.dispose();
+    _tableEntryController.dispose();
     super.dispose();
   }
 
-  void _showCategoriesSheet(List<QueryDocumentSnapshot> cats) {
-    _catSearchCtrl.clear();
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF0F0800),
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            List<QueryDocumentSnapshot> filteredCats = cats;
-
-            String q = _catSearchCtrl.text.trim();
-            if (q.isNotEmpty) {
-              filteredCats = cats.where((doc) {
-                String name = (doc['name'] ?? "").toString();
-                return name.contains(q);
-              }).toList();
-            }
-
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-                left: 15,
-                right: 15,
-                top: 15,
-              ),
-              child: SizedBox(
-                height: MediaQuery.of(context).size.height * 0.75,
-                child: Column(
-                  children: [
-                    Container(
-                      width: 60,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: Colors.white24,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    const SizedBox(height: 15),
-                    const Text(
-                      "اختر القسم",
-                      style: TextStyle(
-                        color: CafeTheme.primaryGold,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 15),
-                    TextField(
-                      controller: _catSearchCtrl,
-                      onChanged: (_) => setSheetState(() {}),
-                      decoration: InputDecoration(
-                        hintText: "ابحث عن قسم...",
-                        hintStyle: const TextStyle(color: Colors.white38),
-                        prefixIcon: const Icon(
-                          Icons.search,
-                          color: CafeTheme.primaryGold,
-                        ),
-                        filled: true,
-                        fillColor: Colors.white.withValues(alpha: 0.05),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 15),
-                    Expanded(
-                      child: GridView.builder(
-                        itemCount: filteredCats.length,
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: 2.8,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                        ),
-                        itemBuilder: (context, i) {
-                          String catName =
-                              (filteredCats[i]['name'] ?? "").toString();
-                          bool selected = currentCat == catName;
-
-                          return InkWell(
-                            borderRadius: BorderRadius.circular(18),
-                            onTap: () {
-                              setState(() => currentCat = catName);
-                              Navigator.pop(context);
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                gradient:
-                                    selected ? CafeTheme.goldGradient : null,
-                                color: selected
-                                    ? null
-                                    : CafeTheme.warmBrown
-                                        .withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(18),
-                                border: Border.all(
-                                  color: selected
-                                      ? CafeTheme.primaryGold
-                                      : CafeTheme.warmBrown
-                                          .withValues(alpha: 0.3),
-                                ),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  catName,
-                                  textAlign: TextAlign.center,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color:
-                                        selected ? Colors.black : Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _checkSavedData() {
-    if (kIsWeb) {
-      final savedName = html.window.localStorage['customer_name'];
-      if (savedName != null && savedName.isNotEmpty) {
-        setState(() {
-          registeredName = savedName;
-          _hasSavedName = true;
-        });
-      }
-    }
-  }
-
-  void _openUrl(String url) => js.context.callMethod('open', [url]);
-
   void _playSound(String url) {
-    if (kIsWeb) {
-      js.context.callMethod('eval', [
-        "(function() { var audio = new Audio('$url'); audio.play(); })();",
-      ]);
-    }
+    debugPrint("Play sound requested: $url");
+  }
+
+  void _openUrl(String url) {
+    debugPrint("Open URL requested: $url");
   }
 
   void _playMicrowaveWorking() =>
@@ -387,7 +244,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           backgroundColor: const Color(0xFF120C05),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(30),
-            side: const BorderSide(color: CafeTheme.primaryGold, width: 0.5),
+            side: BorderSide(
+                color: CafeTheme.primaryGold.withValues(alpha: 0.5),
+                width: 0.5),
           ),
           title: const Text(
             "تواصل مع المطور 👨‍💻",
@@ -472,7 +331,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         backgroundColor: const Color(0xFF1A1008),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(25),
-          side: const BorderSide(color: CafeTheme.primaryGold, width: 0.5),
+          side: BorderSide(
+              color: CafeTheme.primaryGold.withValues(alpha: 0.5), width: 0.5),
         ),
         title: const Text(
           'دخول الويتر 🤵',
@@ -552,9 +412,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     );
   }
 
-  // ==========================================
-  // شاشة الدخول - داخل المكان فقط
-  // ==========================================
   Widget _buildEntryOverlay() {
     return BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
@@ -592,28 +449,19 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                     style: TextStyle(color: Colors.white54, fontSize: 13),
                   ),
                   const SizedBox(height: 30),
-
-                  // حقل الاسم
-                  if (!_hasSavedName) ...[
-                    _entryField(
-                      _nameEntryController,
-                      "اسمك الكريم..",
-                      Icons.person_outline_rounded,
-                    ),
-                    const SizedBox(height: 15),
-                  ],
-
-                  // حقل رقم الطاولة
+                  _entryField(
+                    _nameEntryController,
+                    "اسمك الكريم..",
+                    Icons.person_outline_rounded,
+                  ),
+                  const SizedBox(height: 15),
                   _entryField(
                     _tableEntryController,
                     "رقم الطاولة..",
                     Icons.table_restaurant_rounded,
                     isNumber: true,
                   ),
-
                   const SizedBox(height: 25),
-
-                  // زرار البداية
                   _buildAnimatedButton(
                     onPressed: _validateAndStart,
                     child: const Text(
@@ -625,10 +473,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 15),
-
-                  // زرار تسجيل الدخول كويتر
                   TextButton.icon(
                     onPressed: _showWaiterLogin,
                     icon: const Icon(
@@ -678,8 +523,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   }
 
   void _validateAndStart() {
-    String name =
-        _hasSavedName ? registeredName! : _nameEntryController.text.trim();
+    String name = _nameEntryController.text.trim();
 
     if (name.isEmpty) {
       _showStatusSnackBar("يرجى إدخال الاسم", Colors.redAccent);
@@ -692,8 +536,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     }
 
     currentTable = _tableEntryController.text.trim();
-
-    if (kIsWeb) html.window.localStorage['customer_name'] = name;
 
     setState(() {
       registeredName = name;
@@ -746,16 +588,18 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             color: const Color(0xE0080300),
             colorBlendMode: BlendMode.darken,
             errorBuilder: (context, error, stackTrace) =>
-                Container(color: Colors.black),
+                Container(color: CafeTheme.darkBg),
           ),
         ),
         CustomScrollView(
+          physics: const BouncingScrollPhysics(),
           slivers: [
             _buildAppBar(),
             _buildBestSellers(),
-            _buildCategoryBar(),
-            _buildProductList(),
-            const SliverToBoxAdapter(child: SizedBox(height: 550)),
+            _buildCategories(),
+            _buildMenuLabel(),
+            _buildProductsGrid(),
+            const SliverToBoxAdapter(child: SizedBox(height: 350)),
           ],
         ),
         _buildBottomActionArea(),
@@ -766,8 +610,10 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   Widget _buildAppBar() {
     return SliverAppBar(
       expandedHeight: 180,
-      backgroundColor: Colors.transparent,
+      backgroundColor: CafeTheme.surface,
+      surfaceTintColor: Colors.transparent,
       pinned: true,
+      elevation: 0,
       leadingWidth: 150,
       leading: Center(
         child: ScaleTransition(
@@ -813,17 +659,11 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       ),
       flexibleSpace: FlexibleSpaceBar(
         centerTitle: true,
+        background: Container(color: Colors.transparent),
         title: Column(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            GestureDetector(
-              onTap: () {
-                if (kIsWeb) {
-                  html.window.location.reload();
-                }
-              },
-              child: buildstormLogo(size: 40),
-            ),
+            buildstormLogo(size: 40),
             const SizedBox(height: 5),
             const Text(
               "storm",
@@ -844,99 +684,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         ),
       ),
       actions: [
-        // زرار تغيير الطاولة
-        Padding(
-          padding: const EdgeInsets.only(left: 5, top: 15),
-          child: ScaleTransition(
-            scale: Tween(begin: 0.95, end: 1.05).animate(
-              CurvedAnimation(
-                parent: _changeTablePulseController,
-                curve: Curves.easeInOut,
-              ),
-            ),
-            child: GestureDetector(
-              onTap: _changeTableDialog,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(
-                    color: CafeTheme.primaryGold.withValues(alpha: 0.4),
-                  ),
-                ),
-                child: const Icon(
-                  Icons.sync_alt_rounded,
-                  color: CafeTheme.primaryGold,
-                  size: 16,
-                ),
-              ),
-            ),
-          ),
-        ),
         _buildWaiterButton(),
       ],
-    );
-  }
-
-  void _changeTableDialog() {
-    _tableEntryController.text = currentTable ?? "";
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1008),
-        title: const Text(
-          "تغيير الطاولة 🪑",
-          textAlign: TextAlign.center,
-          style: TextStyle(color: CafeTheme.primaryGold),
-        ),
-        content: TextField(
-          controller: _tableEntryController,
-          textAlign: TextAlign.center,
-          keyboardType: TextInputType.number,
-          style: const TextStyle(color: Colors.white, fontSize: 24),
-          decoration: InputDecoration(
-            hintText: "رقم الطاولة الجديد",
-            filled: true,
-            fillColor: Colors.white.withValues(alpha: 0.05),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
-              borderSide: BorderSide.none,
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("إلغاء"),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: CafeTheme.primaryGold,
-            ),
-            onPressed: () {
-              if (_tableEntryController.text.isNotEmpty) {
-                setState(() => currentTable = _tableEntryController.text);
-                Navigator.pop(context);
-                _showStatusSnackBar(
-                  "تم تغيير الطاولة إلى ${_tableEntryController.text} 🪑",
-                  CafeTheme.primaryGold,
-                );
-              }
-            },
-            child: const Text(
-              "تحديث",
-              style: TextStyle(
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -990,7 +739,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           const Padding(
             padding: EdgeInsets.fromLTRB(0, 30, 25, 15),
             child: Text(
-              "الأكثر طلباً 🔥",
+              "🔥 الأكثر طلباً",
               style: TextStyle(
                 color: CafeTheme.primaryGold,
                 fontSize: 16,
@@ -999,7 +748,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             ),
           ),
           SizedBox(
-            height: 155,
+            height: 195,
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('products')
@@ -1010,6 +759,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 var items = snapshot.data!.docs;
                 return ListView.builder(
                   scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   itemCount: items.length,
                   itemBuilder: (context, index) {
@@ -1018,63 +768,72 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                     return GestureDetector(
                       onTap: () => _showAddDialog(item),
                       child: Container(
-                        width: 110,
+                        width: 130,
                         margin: const EdgeInsets.symmetric(horizontal: 8),
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF2A1A0A), Color(0xFF1A0F05)],
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                          ),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: CafeTheme.primaryGold.withValues(alpha: 0.3),
+                          border: Border(
+                            bottom: BorderSide(
+                                color: CafeTheme.primaryGold, width: 2.0),
                           ),
                         ),
-                        child: Column(
-                          children: [
-                            ClipRRect(
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(20),
-                              ),
-                              child: (imgUrl != null && imgUrl.isNotEmpty)
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              (imgUrl != null && imgUrl.isNotEmpty)
                                   ? Image.network(
                                       imgUrl,
-                                      width: 110,
-                                      height: 75,
                                       fit: BoxFit.cover,
+                                      errorBuilder: (context, error,
+                                              stackTrace) =>
+                                          Container(
+                                              color: CafeTheme.surfaceLight),
                                     )
                                   : Container(
-                                      width: 110,
-                                      height: 75,
                                       decoration: const BoxDecoration(
                                         gradient: CafeTheme.goldGradient,
                                       ),
                                       child: const Icon(
                                         Icons.local_cafe_rounded,
                                         color: Colors.black54,
-                                        size: 32,
+                                        size: 40,
                                       ),
                                     ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 6,
-                              ),
-                              child: Text(
-                                item['name'] ?? "",
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: CafeTheme.primaryGoldLight,
+                              Positioned.fill(
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.transparent,
+                                        Colors.black.withValues(alpha: 0.87),
+                                      ],
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      stops: const [0.5, 1.0],
+                                    ),
+                                  ),
                                 ),
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                          ],
+                              Positioned(
+                                bottom: 12,
+                                left: 10,
+                                right: 10,
+                                child: Text(
+                                  item['name'] ?? "",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     );
@@ -1088,120 +847,112 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildCategoryBar() {
+  Widget _buildCategories() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('categories')
           .orderBy('index')
           .snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) {
+        if (!snapshot.hasData)
           return const SliverToBoxAdapter(child: SizedBox());
-        }
         var cats = snapshot.data!.docs;
         if (currentCat == null && cats.isNotEmpty) {
-          currentCat = cats.first['name'];
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            setState(() => currentCat = cats.first['name']);
+          });
         }
-        return SliverPersistentHeader(
-          pinned: true,
-          delegate: _HeaderDelegate(
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF0F0800), Color(0xFF1A1008)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                border: Border(
-                  bottom: BorderSide(color: CafeTheme.warmBrown, width: 0.5),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: CafeTheme.warmBrown,
-                        foregroundColor: CafeTheme.primaryGoldLight,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25),
-                          side: const BorderSide(
-                              color: CafeTheme.primaryGold, width: 0.8),
+        return SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 25, bottom: 10),
+            child: SizedBox(
+              height: 100,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                itemCount: cats.length,
+                itemBuilder: (context, index) {
+                  String catName = cats[index]['name'] ?? "";
+                  bool isSelected = currentCat == catName;
+                  return GestureDetector(
+                    onTap: () => setState(() => currentCat = catName),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                      width: 80,
+                      margin: const EdgeInsets.symmetric(horizontal: 8),
+                      decoration: BoxDecoration(
+                        gradient: isSelected
+                            ? const LinearGradient(
+                                colors: [
+                                  CafeTheme.warmBrown,
+                                  CafeTheme.deepBrown
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              )
+                            : const LinearGradient(
+                                colors: [Color(0xFF1E1005), Color(0xFF150B03)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isSelected
+                              ? CafeTheme.primaryGold
+                              : CafeTheme.warmBrown.withValues(alpha: 0.25),
+                          width: isSelected ? 1.5 : 1.0,
                         ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 12,
-                        ),
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: CafeTheme.primaryGold
+                                      .withValues(alpha: 0.25),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
+                                )
+                              ]
+                            : null,
                       ),
-                      onPressed: () => _showCategoriesSheet(cats),
-                      icon: const Icon(Icons.grid_view_rounded, size: 18),
-                      label: const Text(
-                        "كل الأقسام",
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      itemCount: cats.length,
-                      itemBuilder: (c, i) {
-                        bool isSelected = currentCat == cats[i]['name'];
-                        return GestureDetector(
-                          onTap: () =>
-                              setState(() => currentCat = cats[i]['name']),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 400),
-                            margin: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 15,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
                             ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 30,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              gradient: isSelected
-                                  ? const LinearGradient(
-                                      colors: [
-                                        CafeTheme.primaryGold,
-                                        CafeTheme.warmBrown,
-                                      ],
-                                    )
-                                  : null,
+                            child: Icon(
+                              CategoryIcons.resolve(catName),
                               color: isSelected
-                                  ? null
-                                  : CafeTheme.warmBrown.withValues(alpha: 0.15),
-                              border: Border.all(
-                                color: isSelected
-                                    ? CafeTheme.primaryGold
-                                    : CafeTheme.warmBrown
-                                        .withValues(alpha: 0.3),
-                                width: 0.8,
-                              ),
-                              borderRadius: BorderRadius.circular(30),
-                            ),
-                            child: Center(
-                              child: Text(
-                                cats[i]['name'] ?? "",
-                                style: TextStyle(
-                                  color: isSelected
-                                      ? Colors.black
-                                      : Colors.white70,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w900
-                                      : FontWeight.normal,
-                                ),
-                              ),
+                                  ? CafeTheme.primaryGold
+                                  : Colors.white38,
+                              size: 24,
                             ),
                           ),
-                        );
-                      },
+                          const SizedBox(height: 6),
+                          Text(
+                            catName,
+                            style: TextStyle(
+                              color: isSelected
+                                  ? CafeTheme.primaryGold
+                                  : Colors.white54,
+                              fontSize: 10,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  );
+                },
               ),
             ),
           ),
@@ -1210,7 +961,40 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildProductList() {
+  Widget _buildMenuLabel() {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 15),
+        child: Row(
+          children: [
+            Container(
+              width: 3,
+              height: 18,
+              decoration: const BoxDecoration(gradient: CafeTheme.goldGradient),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              currentCat ?? "",
+              style: const TextStyle(
+                color: CafeTheme.primaryGoldLight,
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: 15),
+            Expanded(
+              child: Divider(
+                color: CafeTheme.warmBrown.withValues(alpha: 0.4),
+                thickness: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProductsGrid() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('products')
@@ -1225,140 +1009,192 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           );
         }
         var items = snapshot.data!.docs;
-        return SliverList(
-          delegate: SliverChildBuilderDelegate((c, i) {
-            var item = items[i].data() as Map<String, dynamic>;
-            String? imgUrl = item['image_url'];
-            bool hasSizes =
-                item['sizes'] != null && (item['sizes'] as List).isNotEmpty;
+        return SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 0.68,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                var item = items[index].data() as Map<String, dynamic>;
+                String? imgUrl = item['image_url'];
+                bool hasSizes =
+                    item['sizes'] != null && (item['sizes'] as List).isNotEmpty;
 
-            return GestureDetector(
-              onTap: () => _showAddDialog(item),
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF221408), Color(0xFF1A0F05)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: CafeTheme.warmBrown.withValues(alpha: 0.4),
-                    width: 1,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: CafeTheme.deepBrown.withValues(alpha: 0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    // صورة المنتج
-                    ClipRRect(
-                      borderRadius: const BorderRadius.only(
-                        topRight: Radius.circular(24),
-                        bottomRight: Radius.circular(24),
+                return GestureDetector(
+                  onTap: () => _showAddDialog(item),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF241505), Color(0xFF160D03)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                      child: (imgUrl != null && imgUrl.isNotEmpty)
-                          ? Image.network(
-                              imgUrl,
-                              width: 90,
-                              height: 90,
-                              fit: BoxFit.cover,
-                            )
-                          : Container(
-                              width: 90,
-                              height: 90,
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    CafeTheme.deepBrown,
-                                    CafeTheme.warmBrown
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
+                      border: Border.all(
+                        color: CafeTheme.warmBrown.withValues(alpha: 0.35),
+                      ),
+                      borderRadius: BorderRadius.circular(22),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.4),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          flex: 5,
+                          child: ClipRRect(
+                            borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(22)),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                (imgUrl != null && imgUrl.isNotEmpty)
+                                    ? Image.network(
+                                        imgUrl,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error,
+                                                stackTrace) =>
+                                            Container(
+                                                color: CafeTheme.surfaceLight),
+                                      )
+                                    : Container(
+                                        decoration: const BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              CafeTheme.deepBrown,
+                                              CafeTheme.warmBrown
+                                            ],
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                          ),
+                                        ),
+                                        child: const Icon(
+                                          Icons.local_cafe_rounded,
+                                          color: CafeTheme.primaryGold,
+                                          size: 36,
+                                        ),
+                                      ),
+                                Positioned.fill(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          Colors.transparent,
+                                          Colors.black.withValues(alpha: 0.5),
+                                        ],
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        stops: const [0.5, 1.0],
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                              ),
-                              child: const Icon(
-                                Icons.local_cafe_rounded,
-                                color: CafeTheme.primaryGold,
-                                size: 36,
-                              ),
-                            ),
-                    ),
-                    const SizedBox(width: 15),
-                    // اسم وسعر المنتج
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            item['name'] ?? "",
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 16,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color:
-                                  CafeTheme.primaryGold.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: CafeTheme.primaryGold
-                                    .withValues(alpha: 0.3),
-                              ),
-                            ),
-                            child: Text(
-                              hasSizes
-                                  ? "أحجام مختلفة ✦"
-                                  : "${item['price']} ج.م",
-                              style: TextStyle(
-                                color: hasSizes
-                                    ? CafeTheme.primaryGoldLight
-                                    : CafeTheme.primaryGold,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
+                                Align(
+                                  alignment: Alignment.topLeft,
+                                  child: Container(
+                                    margin: const EdgeInsets.all(8),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: CafeTheme.deepBrown
+                                          .withValues(alpha: 0.88),
+                                      border: Border.all(
+                                        color: CafeTheme.primaryGold
+                                            .withValues(alpha: 0.5),
+                                      ),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      hasSizes
+                                          ? "✦ أحجام"
+                                          : "${item['price']} ج",
+                                      style: const TextStyle(
+                                        color: CafeTheme.primaryGold,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                    // زرار الإضافة
-                    Padding(
-                      padding: const EdgeInsets.only(left: 12),
-                      child: Container(
-                        width: 42,
-                        height: 42,
-                        decoration: const BoxDecoration(
-                          gradient: CafeTheme.goldGradient,
-                          shape: BoxShape.circle,
                         ),
-                        child: const Icon(
-                          Icons.add_rounded,
-                          color: Colors.black,
-                          size: 24,
+                        Expanded(
+                          flex: 3,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item['name'] ?? "",
+                                  style: const TextStyle(
+                                    color: CafeTheme.primaryGoldLight,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      hasSizes
+                                          ? "حسب الحجم"
+                                          : "${item['price']} ج.م",
+                                      style: const TextStyle(
+                                        color: CafeTheme.primaryGold,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    Container(
+                                      width: 32,
+                                      height: 32,
+                                      decoration: BoxDecoration(
+                                        gradient: const LinearGradient(
+                                          colors: [
+                                            CafeTheme.primaryGold,
+                                            CafeTheme.warmBrown
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: const Icon(
+                                        Icons.add_rounded,
+                                        color: Colors.black,
+                                        size: 20,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                  ],
-                ),
-              ),
-            );
-          }, childCount: items.length),
+                  ),
+                );
+              },
+              childCount: items.length,
+            ),
+          ),
         );
       },
     );
@@ -1516,8 +1352,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
           child: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
                 colors: [Color(0xE6120C05), Color(0xF0080400)],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
@@ -1526,13 +1362,15 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 top: BorderSide(color: CafeTheme.warmBrown, width: 1.5),
               ),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildActiveOrdersTracker(),
-                _buildBasketRow(),
-                _buildCheckoutBar(),
-              ],
+            child: SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildActiveOrdersTracker(),
+                  _buildBasketRow(),
+                  _buildCheckoutBar(),
+                ],
+              ),
             ),
           ),
         ),
@@ -1540,9 +1378,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     );
   }
 
-  // ==========================================
-  // ميزة جديدة: تتبع الطلبات النشطة مع التصميم المحسّن
-  // ==========================================
   Widget _buildActiveOrdersTracker() {
     if (registeredName == null) return const SizedBox();
     return StreamBuilder<QuerySnapshot>(
@@ -1555,14 +1390,16 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           return const SizedBox();
         }
         var orders = snapshot.data!.docs;
-        return SizedBox(
-          height: 155,
+        return Container(
+          padding: const EdgeInsets.only(top: 15),
+          height: 110,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 25),
             itemCount: orders.length,
-            itemBuilder: (c, i) {
-              var data = orders[i].data() as Map<String, dynamic>;
+            itemBuilder: (context, index) {
+              var data = orders[index].data() as Map<String, dynamic>;
               String status = data['status'] ?? "قيد الانتظار";
               Color sColor = status == "جاهز"
                   ? Colors.greenAccent
@@ -1570,7 +1407,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                       ? Colors.orangeAccent
                       : Colors.white38);
 
-              // أيقونة الحالة
               IconData statusIcon = status == "جاهز"
                   ? Icons.check_circle_rounded
                   : (status == "جاري التجهيز"
@@ -1579,33 +1415,36 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 
               return Container(
                 width: 170,
-                margin: const EdgeInsets.all(8),
+                margin: const EdgeInsets.symmetric(horizontal: 8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.06),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF221408), Color(0xFF1A0F05)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                   borderRadius: BorderRadius.circular(25),
                   border: Border.all(
-                      color: sColor.withValues(alpha: 0.3), width: 2),
+                      color: sColor.withValues(alpha: 0.3), width: 1.5),
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(statusIcon, color: sColor, size: 30),
-                    const SizedBox(height: 8),
+                    Icon(statusIcon, color: sColor, size: 24),
+                    const SizedBox(height: 6),
                     Text(
                       status,
                       style: TextStyle(
                         color: sColor,
                         fontWeight: FontWeight.bold,
+                        fontSize: 12,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    // ميزة جديدة: عرض عدد الأصناف
                     if (data['items_with_qty'] != null)
                       Text(
                         "${(data['items_with_qty'] as List).length} صنف",
                         style: const TextStyle(
                           color: Colors.white38,
-                          fontSize: 11,
+                          fontSize: 10,
                         ),
                       ),
                   ],
@@ -1625,14 +1464,17 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       padding: const EdgeInsets.only(top: 15),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 20),
         itemCount: basket.length,
-        itemBuilder: (c, i) => Container(
+        itemBuilder: (context, index) => Container(
           width: 180,
           margin: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               colors: [Color(0xFF221408), Color(0xFF1A0F05)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(25),
             border: Border.all(
@@ -1641,55 +1483,59 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                basket[i]['name'],
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Text(
+                  basket[index]['name'],
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                 ),
-                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   IconButton(
-                    icon: const Icon(
-                      Icons.remove_circle_outline,
-                      color: Colors.redAccent,
-                    ),
+                    icon: const Icon(Icons.remove_circle_outline,
+                        color: Colors.redAccent),
                     onPressed: () => setState(() {
-                      if (basket[i]['quantity'] > 1) {
-                        basket[i]['quantity']--;
+                      if (basket[index]['quantity'] > 1) {
+                        basket[index]['quantity']--;
                       } else {
-                        basket.removeAt(i);
+                        basket.removeAt(index);
                       }
                     }),
                   ),
                   Text(
-                    "${basket[i]['quantity']}",
+                    "${basket[index]['quantity']}",
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(
-                      Icons.add_circle_outline,
-                      color: Colors.greenAccent,
-                    ),
-                    onPressed: () => setState(() => basket[i]['quantity']++),
+                    icon: const Icon(Icons.add_circle_outline,
+                        color: Colors.greenAccent),
+                    onPressed: () =>
+                        setState(() => basket[index]['quantity']++),
                   ),
                 ],
               ),
-              if (basket[i]['note'] != "بدون إضافات")
-                Text(
-                  "📝 ${basket[i]['note']}",
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: Colors.orangeAccent,
+              if (basket[index]['note'] != "بدون إضافات")
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Text(
+                    "📝 ${basket[index]['note']}",
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: Colors.orangeAccent,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
             ],
           ),
@@ -1705,7 +1551,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           previousValue + ((item['price'] as num) * (item['quantity'] as num)),
     );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(35, 20, 35, 50),
+      padding: const EdgeInsets.fromLTRB(35, 20, 35, 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -1724,52 +1570,36 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                   color: CafeTheme.primaryGold,
                 ),
               ),
-              // ميزة جديدة: عرض عدد الأصناف في السلة
-              if (basket.isNotEmpty)
-                Text(
-                  "${basket.length} صنف في السلة",
-                  style: const TextStyle(color: Colors.white38, fontSize: 11),
-                ),
             ],
           ),
-          Column(
-            children: [
-              ElevatedButton(
-                onPressed: basket.isEmpty ? null : _sendOrder,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: CafeTheme.primaryGold,
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 40,
-                    vertical: 18,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-                child: const Text(
-                  "تأكيد الطلب ⚡",
-                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+          ElevatedButton(
+            onPressed: basket.isEmpty ? null : _sendOrder,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: CafeTheme.warmBrown,
+              disabledBackgroundColor:
+                  CafeTheme.warmBrown.withValues(alpha: 0.3),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 30,
+                vertical: 18,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(
+                  color: basket.isEmpty
+                      ? Colors.transparent
+                      : CafeTheme.primaryGold,
+                  width: 1.5,
                 ),
               ),
-              // ميزة جديدة: زرار مسح السلة
-              if (basket.isNotEmpty)
-                TextButton.icon(
-                  onPressed: () {
-                    setState(() => basket.clear());
-                    _showStatusSnackBar("تم مسح السلة", Colors.redAccent);
-                  },
-                  icon: const Icon(
-                    Icons.delete_outline,
-                    color: Colors.redAccent,
-                    size: 16,
-                  ),
-                  label: const Text(
-                    "مسح السلة",
-                    style: TextStyle(color: Colors.redAccent, fontSize: 12),
-                  ),
-                ),
-            ],
+            ),
+            child: const Text(
+              "تأكيد الطلب ⚡",
+              style: TextStyle(
+                color: CafeTheme.primaryGoldLight,
+                fontWeight: FontWeight.w900,
+                fontSize: 16,
+              ),
+            ),
           ),
         ],
       ),
@@ -1834,19 +1664,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   }
 }
 
-class _HeaderDelegate extends SliverPersistentHeaderDelegate {
-  final Widget child;
-  _HeaderDelegate({required this.child});
-  @override
-  double get minExtent => 90;
-  @override
-  double get maxExtent => 90;
-  @override
-  Widget build(c, o, p) => child;
-  @override
-  bool shouldRebuild(o) => true;
-}
-
 // ==========================================
 // صفحة الويتر
 // ==========================================
@@ -1875,11 +1692,7 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
   }
 
   void _playSound(String url) {
-    if (kIsWeb) {
-      js.context.callMethod('eval', [
-        "(function() { var audio = new Audio('$url'); audio.play(); })();",
-      ]);
-    }
+    debugPrint("Playing sound in WaiterTerminal: $url");
   }
 
   void _playBell() => _playSound(
@@ -2446,7 +2259,6 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                     style: const TextStyle(color: Colors.white70),
                   ),
                   const SizedBox(height: 8),
-                  // أزرار تغيير الحالة
                   Row(
                     children: [
                       _statusButton(
