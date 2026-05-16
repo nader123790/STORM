@@ -220,6 +220,11 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   String? _lastAddedItem;
   // ✦ ميزة جديدة 3: وضع المظهر الليلي الإضافي (تعتيم أكثر)
   bool _isDimMode = false;
+
+  // ✦ الطقس الذكي للاقتراح اليومي
+  double? _weatherTemp;
+  String _weatherCondition = "";
+  String _weatherEmoji = "🌤️";
   // ✦ ميزة جديدة 4: العروض والخصومات بانر دوّار
   int _promoBannerIndex = 0;
   final List<String> _promoMessages = [
@@ -248,6 +253,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 
     // ✦ تحميل الاسم المحفوظ من localStorage
     _loadSavedName();
+    _fetchWeather();
 
     _devPulseController = AnimationController(
       vsync: this,
@@ -320,6 +326,209 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       debugPrint("localStorage save error: $e");
     }
   }
+
+  // ==========================================
+  // ✦ جلب الطقس من Open-Meteo (مجاني بدون API key)
+  // المنطق: القاهرة/مصر بشكل افتراضي — إحداثيات 30.06°N 31.22°E
+  // ==========================================
+  void _fetchWeather() {
+    try {
+      // نستخدم Open-Meteo API — مجانية 100%
+      // current_weather يرجع: temperature, weathercode, windspeed
+      const url =
+          'https://api.open-meteo.com/v1/forecast'
+          '?latitude=31.4&longitude=31.1'
+          '&current_weather=true'
+          '&temperature_unit=celsius';
+
+      js.context.callMethod('eval', ['''
+        (async function() {
+          try {
+            const r = await fetch("$url");
+            const d = await r.json();
+            const t = d.current_weather.temperature;
+            const c = d.current_weather.weathercode;
+            window._stormWeatherTemp = t;
+            window._stormWeatherCode = c;
+          } catch(e) {
+            window._stormWeatherTemp = null;
+            window._stormWeatherCode = null;
+          }
+        })();
+      '''.replaceAll('\$url', url)]);
+
+      // نقرأ النتيجة بعد ٣ ثواني
+      Future.delayed(const Duration(seconds: 3), () {
+        if (!mounted) return;
+        try {
+          final temp = js.context['_stormWeatherTemp'];
+          final code = js.context['_stormWeatherCode'];
+          if (temp != null) {
+            final t = (temp as num).toDouble();
+            final c = (code as num?)?.toInt() ?? 0;
+            setState(() {
+              _weatherTemp = t;
+              _weatherCondition = _mapWeatherCode(c);
+              _weatherEmoji = _mapWeatherEmoji(c, t);
+            });
+          }
+        } catch (e) {
+          debugPrint("Weather read error: $e");
+        }
+      });
+    } catch (e) {
+      debugPrint("Weather fetch error: $e");
+    }
+  }
+
+  // ✦ ترجمة weather code لحالة مقروءة
+  String _mapWeatherCode(int code) {
+    if (code == 0) return "صافي";
+    if (code <= 3) return "غائم جزئياً";
+    if (code <= 49) return "ضبابي";
+    if (code <= 67) return "ممطر";
+    if (code <= 77) return "ثلجي";
+    if (code <= 82) return "أمطار غزيرة";
+    if (code <= 99) return "عاصفة";
+    return "متغير";
+  }
+
+  // ✦ إيموجي الطقس
+  String _mapWeatherEmoji(int code, double temp) {
+    if (code == 0 && temp > 30) return "🔥";
+    if (code == 0) return "☀️";
+    if (code <= 3) return "⛅";
+    if (code <= 49) return "🌫️";
+    if (code <= 67) return "🌧️";
+    if (code <= 77) return "❄️";
+    if (code <= 82) return "⛈️";
+    return "🌩️";
+  }
+
+  // ==========================================
+  // ✦ المنطق الذكي للاقتراح — يجمع ٣ عوامل:
+  //   ١. الطقس (حار/بارد/ممطر)
+  //   ٢. الوقت في اليوم (صباح/ظهر/مساء/ليل)
+  //   ٣. الأكثر طلباً من Firebase
+  // ==========================================
+  Map<String, dynamic> _buildSmartSuggestion(
+      List<Map<String, dynamic>> topProducts) {
+    final hour = DateTime.now().hour;
+    final temp = _weatherTemp ?? 25.0;
+    final condition = _weatherCondition;
+
+    // ── تحديد الوقت ──
+    String timeSlot;
+    String timeLabel;
+    if (hour >= 5 && hour < 10) {
+      timeSlot = "morning";
+      timeLabel = "الصبح";
+    } else if (hour >= 10 && hour < 14) {
+      timeSlot = "noon";
+      timeLabel = "الضهر";
+    } else if (hour >= 14 && hour < 19) {
+      timeSlot = "afternoon";
+      timeLabel = "بعد الضهر";
+    } else if (hour >= 19 && hour < 23) {
+      timeSlot = "evening";
+      timeLabel = "المساء";
+    } else {
+      timeSlot = "night";
+      timeLabel = "الليل";
+    }
+
+    // ── تحديد حالة الطقس ──
+    bool isHot = temp > 28;
+    bool isCold = temp < 18;
+    bool isRainy = condition.contains("ممطر") || condition.contains("عاصفة");
+
+    // ── بناء قائمة أولويات الكلمات المفتاحية ──
+    // بناءً على الطقس + الوقت
+    List<String> preferredKeywords = [];
+
+    if (isRainy || isCold) {
+      // طقس بارد أو ممطر → يفضل المشروبات الساخنة
+      if (timeSlot == "morning" || timeSlot == "noon") {
+        preferredKeywords = ["قهوة", "اسبريسو", "شاي", "لاتيه", "كابتشينو", "موكا"];
+      } else {
+        preferredKeywords = ["شاي", "قهوة", "لاتيه", "شوكولاتة", "هوت"];
+      }
+    } else if (isHot) {
+      // طقس حار → يفضل المشروبات الباردة
+      if (timeSlot == "morning") {
+        preferredKeywords = ["قهوة", "كولد برو", "آيس", "لاتيه"];
+      } else {
+        preferredKeywords = ["عصير", "موهيتو", "فرابتشينو", "كولد", "آيس", "مثلجات", "سموزي", "ليمون"];
+      }
+    } else {
+      // طقس معتدل
+      if (timeSlot == "morning") {
+        preferredKeywords = ["قهوة", "اسبريسو", "لاتيه", "كابتشينو"];
+      } else if (timeSlot == "noon" || timeSlot == "afternoon") {
+        preferredKeywords = ["عصير", "موهيتو", "كولد", "آيس"];
+      } else {
+        preferredKeywords = ["شاي", "قهوة", "حلى", "كيك", "ديزرت"];
+      }
+    }
+
+    // ── ابحث عن أفضل منتج من الأكثر طلباً يطابق الكلمات المفضلة ──
+    Map<String, dynamic>? bestMatch;
+    int bestScore = -1;
+
+    for (var product in topProducts) {
+      final name = (product['name'] ?? '').toString().toLowerCase();
+      int score = 0;
+
+      // الأكثر طلباً له أولوية أساسية
+      final orderCount = (product['order_count'] as num?)?.toInt() ?? 0;
+      score += (orderCount > 50 ? 3 : orderCount > 20 ? 2 : orderCount > 5 ? 1 : 0);
+
+      // مطابقة الكلمات المفضلة
+      for (int ki = 0; ki < preferredKeywords.length; ki++) {
+        if (name.contains(preferredKeywords[ki])) {
+          score += (preferredKeywords.length - ki) * 2; // الأول له أعلى وزن
+          break;
+        }
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = product;
+      }
+    }
+
+    final product = bestMatch ?? (topProducts.isNotEmpty ? topProducts.first : {});
+    final productName = product['name'] ?? "اكتشف أحلى طلب";
+    final orderCount = (product['order_count'] as num?)?.toInt() ?? 0;
+
+    // ── بناء السبب الذكي ──
+    String reason;
+    if (isRainy) {
+      reason = "الجو ممطر — $productName مثالي 🌧️";
+    } else if (isCold) {
+      reason = "الجو برد — $productName يدفيك ☕";
+    } else if (isHot) {
+      reason = "الجو حر — $productName يبردك 🧊";
+    } else {
+      reason = "طقس $condition — اقتراح $timeLabel ✨";
+    }
+
+    String badge = orderCount > 0
+        ? "🔥 طُلب $orderCount مرة"
+        : "⭐ اقتراح $timeLabel";
+
+    return {
+      'product': product,
+      'name': productName,
+      'reason': reason,
+      'badge': badge,
+      'timeLabel': timeLabel,
+      'weatherInfo': _weatherTemp != null
+          ? "${_weatherTemp!.toStringAsFixed(0)}° $condition $_weatherEmoji"
+          : "",
+    };
+  }
+
 
   @override
   void dispose() {
@@ -3853,59 +4062,58 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   // ✦ اقتراح اليوم الذكي — من Firebase
   // ==========================================
   Widget _buildDailySpecial() {
-    final hour = DateTime.now().hour;
-    // ✦ اقتراح ذكي بناءً على الوقت: صباح/ظهر/مساء
-    String timeContext = hour < 12
-        ? "الصباح"
-        : hour < 17
-            ? "الظهر"
-            : "المساء";
-    String timeEmoji = hour < 12 ? "☀️" : hour < 17 ? "🌤️" : "🌙";
-
     return SliverToBoxAdapter(
       child: StreamBuilder<QuerySnapshot>(
-        // ✦ جيب المنتج الأكثر طلباً من Firebase حقيقي
+        // ✦ جيب أعلى ١٠ منتجات مرتبة بالأكثر طلباً
         stream: FirebaseFirestore.instance
             .collection('products')
             .orderBy('order_count', descending: true)
-            .limit(1)
+            .limit(10)
             .snapshots(),
         builder: (context, snapshot) {
-          // ✦ fallback ذكي لو مفيش order_count
-          String productName = "اكتشف أحلى طلب";
-          String productEmoji = "✨";
-          String productNote = "اقتراح $timeContext";
-          Map<String, dynamic>? productData;
+          List<Map<String, dynamic>> topProducts = [];
+          if (snapshot.hasData) {
+            topProducts = snapshot.data!.docs
+                .map((d) => d.data() as Map<String, dynamic>)
+                .toList();
+          }
 
-          if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-            productData =
-                snapshot.data!.docs.first.data() as Map<String, dynamic>;
-            productName = productData['name'] ?? productName;
-            final count =
-                (productData['order_count'] as num?)?.toInt() ?? 0;
-            productNote =
-                count > 0 ? "طُلب $count مرة اليوم 🔥" : "اقتراح $timeContext";
-            // ✦ إيموجي ذكي حسب نوع المنتج
-            if (productName.contains("قهوة") ||
-                productName.contains("اسبريسو") ||
-                productName.contains("لاتيه")) {
-              productEmoji = "☕";
-            } else if (productName.contains("عصير") ||
-                productName.contains("موهيتو")) {
-              productEmoji = "🍹";
-            } else if (productName.contains("شوكولاتة") ||
-                productName.contains("كيك")) {
-              productEmoji = "🍫";
-            } else if (productName.contains("شاي")) {
-              productEmoji = "🍵";
-            } else {
-              productEmoji = timeEmoji;
-            }
+          // ✦ المنطق الذكي: طقس + وقت + أكثر طلباً
+          final suggestion = _buildSmartSuggestion(topProducts);
+          final productData = suggestion['product'] as Map<String, dynamic>;
+          final productName = suggestion['name'] as String;
+          final reason = suggestion['reason'] as String;
+          final badge = suggestion['badge'] as String;
+          final timeLabel = suggestion['timeLabel'] as String;
+          final weatherInfo = suggestion['weatherInfo'] as String;
+
+          // ✦ إيموجي المنتج
+          String productEmoji = _weatherEmoji;
+          if (productName.contains("قهوة") || productName.contains("اسبريسو") ||
+              productName.contains("كابتشينو") || productName.contains("موكا")) {
+            productEmoji = "☕";
+          } else if (productName.contains("لاتيه") || productName.contains("هوت")) {
+            productEmoji = (_weatherTemp != null && _weatherTemp! < 20) ? "☕" : "🥛";
+          } else if (productName.contains("شاي")) {
+            productEmoji = "🍵";
+          } else if (productName.contains("عصير") || productName.contains("ليمون") ||
+              productName.contains("سموزي")) {
+            productEmoji = "🍹";
+          } else if (productName.contains("موهيتو")) {
+            productEmoji = "🌿";
+          } else if (productName.contains("كولد") || productName.contains("آيس") ||
+              productName.contains("فرابتشينو") || productName.contains("مثلج")) {
+            productEmoji = "🧊";
+          } else if (productName.contains("شوكولاتة")) {
+            productEmoji = "🍫";
+          } else if (productName.contains("كيك") || productName.contains("حلى") ||
+              productName.contains("ديزرت")) {
+            productEmoji = "🍰";
           }
 
           return GestureDetector(
-            onTap: productData != null
-                ? () => _showAddDialog(productData!)
+            onTap: productData.isNotEmpty
+                ? () => _showAddDialog(productData)
                 : null,
             child: Container(
               margin: const EdgeInsets.fromLTRB(18, 10, 18, 0),
@@ -3927,34 +4135,46 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
               ),
               child: Row(
                 children: [
-                  Text(productEmoji,
-                      style: const TextStyle(fontSize: 32)),
+                  // ✦ إيموجي المنتج الكبير
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(productEmoji,
+                          style: const TextStyle(fontSize: 36)),
+                      if (weatherInfo.isNotEmpty)
+                        Text(
+                          weatherInfo,
+                          style: const TextStyle(
+                            color: Colors.white38,
+                            fontSize: 9,
+                          ),
+                        ),
+                    ],
+                  ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: CafeTheme.primaryGold,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                productNote,
-                                style: const TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                        // ✦ شارة السبب (طلب X مرة / اقتراح وقت)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: CafeTheme.primaryGold,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            badge,
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
                             ),
-                          ],
+                          ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 5),
+                        // ✦ اسم المنتج
                         Text(
                           productName,
                           style: const TextStyle(
@@ -3962,17 +4182,39 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
+                        const SizedBox(height: 3),
+                        // ✦ السبب الذكي (طقس + وقت)
                         Text(
-                          "اقتراح storm لـ$timeContext $timeEmoji — اضغط للإضافة",
+                          reason,
                           style: const TextStyle(
-                              color: Colors.white38, fontSize: 11),
+                            color: Colors.white54,
+                            fontSize: 11,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ),
-                  const Icon(Icons.add_circle_outline_rounded,
-                      color: CafeTheme.primaryGold, size: 22),
+                  const SizedBox(width: 8),
+                  // ✦ زرار الإضافة
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [CafeTheme.primaryGold, CafeTheme.warmBrown],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.add_rounded,
+                        color: Colors.black, size: 22),
+                  ),
                 ],
               ),
             ),
