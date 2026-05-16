@@ -42,14 +42,15 @@ class CategoryIcons {
 }
 
 // ==========================================
-// Optimized image widget - lightweight & smooth
+// Optimized image widget - StatelessWidget (no per-widget AnimationController)
 // ==========================================
-class FastNetworkImage extends StatefulWidget {
+class FastNetworkImage extends StatelessWidget {
   final String url;
   final BoxFit fit;
   final Widget Function(BuildContext) placeholder;
   final int? cacheWidth;
   final int? cacheHeight;
+
   const FastNetworkImage({
     super.key,
     required this.url,
@@ -58,47 +59,19 @@ class FastNetworkImage extends StatefulWidget {
     this.cacheWidth,
     this.cacheHeight,
   });
-  @override
-  State<FastNetworkImage> createState() => _FastNetworkImageState();
-}
-
-class _FastNetworkImageState extends State<FastNetworkImage>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _fadeCtrl;
-  late Animation<double> _fadeAnim;
-
-  @override
-  void initState() {
-    super.initState();
-    _fadeCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 350),
-    );
-    _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeIn);
-  }
-
-  @override
-  void dispose() {
-    _fadeCtrl.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
     return Image.network(
-      widget.url,
-      fit: widget.fit,
-      cacheWidth: widget.cacheWidth ?? 400,
-      cacheHeight: widget.cacheHeight ?? 400,
+      url,
+      fit: fit,
+      cacheWidth: cacheWidth ?? 300,
+      cacheHeight: cacheHeight ?? 300,
       frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-        if (wasSynchronouslyLoaded) return child;
-        if (frame != null) {
-          _fadeCtrl.forward();
-          return FadeTransition(opacity: _fadeAnim, child: child);
-        }
-        return widget.placeholder(context);
+        if (wasSynchronouslyLoaded || frame != null) return child;
+        return placeholder(context);
       },
-      errorBuilder: (c, e, s) => widget.placeholder(c),
+      errorBuilder: (c, e, s) => placeholder(c),
     );
   }
 }
@@ -297,9 +270,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   // ==========================================
   void _loadSavedName() {
     try {
-      final saved = js.context.callMethod('eval', [
-        'window.localStorage.getItem("storm_customer_name")'
-      ]);
+      final saved = js.context.callMethod(
+          'eval', ['window.localStorage.getItem("storm_customer_name")']);
       if (saved != null && saved.toString().isNotEmpty) {
         final name = saved.toString();
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -335,13 +307,13 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     try {
       // نستخدم Open-Meteo API — مجانية 100%
       // current_weather يرجع: temperature, weathercode, windspeed
-      const url =
-          'https://api.open-meteo.com/v1/forecast'
+      const url = 'https://api.open-meteo.com/v1/forecast'
           '?latitude=31.4&longitude=31.1'
           '&current_weather=true'
           '&temperature_unit=celsius';
 
-      js.context.callMethod('eval', ['''
+      js.context.callMethod('eval', [
+        '''
         (async function() {
           try {
             const r = await fetch("$url");
@@ -355,7 +327,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             window._stormWeatherCode = null;
           }
         })();
-      '''.replaceAll('\$url', url)]);
+      '''
+            .replaceAll('\$url', url)
+      ]);
 
       // نقرأ النتيجة بعد ٣ ثواني
       Future.delayed(const Duration(seconds: 3), () {
@@ -449,7 +423,14 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     if (isRainy || isCold) {
       // طقس بارد أو ممطر → يفضل المشروبات الساخنة
       if (timeSlot == "morning" || timeSlot == "noon") {
-        preferredKeywords = ["قهوة", "اسبريسو", "شاي", "لاتيه", "كابتشينو", "موكا"];
+        preferredKeywords = [
+          "قهوة",
+          "اسبريسو",
+          "شاي",
+          "لاتيه",
+          "كابتشينو",
+          "موكا"
+        ];
       } else {
         preferredKeywords = ["شاي", "قهوة", "لاتيه", "شوكولاتة", "هوت"];
       }
@@ -458,7 +439,16 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       if (timeSlot == "morning") {
         preferredKeywords = ["قهوة", "كولد برو", "آيس", "لاتيه"];
       } else {
-        preferredKeywords = ["عصير", "موهيتو", "فرابتشينو", "كولد", "آيس", "مثلجات", "سموزي", "ليمون"];
+        preferredKeywords = [
+          "عصير",
+          "موهيتو",
+          "فرابتشينو",
+          "كولد",
+          "آيس",
+          "مثلجات",
+          "سموزي",
+          "ليمون"
+        ];
       }
     } else {
       // طقس معتدل
@@ -481,7 +471,13 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 
       // الأكثر طلباً له أولوية أساسية
       final orderCount = (product['order_count'] as num?)?.toInt() ?? 0;
-      score += (orderCount > 50 ? 3 : orderCount > 20 ? 2 : orderCount > 5 ? 1 : 0);
+      score += (orderCount > 50
+          ? 3
+          : orderCount > 20
+              ? 2
+              : orderCount > 5
+                  ? 1
+                  : 0);
 
       // مطابقة الكلمات المفضلة
       for (int ki = 0; ki < preferredKeywords.length; ki++) {
@@ -497,7 +493,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       }
     }
 
-    final product = bestMatch ?? (topProducts.isNotEmpty ? topProducts.first : {});
+    final product =
+        bestMatch ?? (topProducts.isNotEmpty ? topProducts.first : {});
     final productName = product['name'] ?? "اكتشف أحلى طلب";
     final orderCount = (product['order_count'] as num?)?.toInt() ?? 0;
 
@@ -513,9 +510,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       reason = "طقس $condition — اقتراح $timeLabel ✨";
     }
 
-    String badge = orderCount > 0
-        ? "🔥 طُلب $orderCount مرة"
-        : "⭐ اقتراح $timeLabel";
+    String badge =
+        orderCount > 0 ? "🔥 طُلب $orderCount مرة" : "⭐ اقتراح $timeLabel";
 
     return {
       'product': product,
@@ -528,7 +524,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           : "",
     };
   }
-
 
   @override
   void dispose() {
@@ -1224,12 +1219,10 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 Container(color: CafeTheme.darkBg),
           ),
         ),
+        // ✦ [PERF] إزالة BackdropFilter الثابت — كان يسبب GPU pass إضافي في كل frame
         Positioned.fill(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
-            child: Container(
-              color: Colors.black.withValues(alpha: _isDimMode ? 0.45 : 0.18),
-            ),
+          child: Container(
+            color: Colors.black.withValues(alpha: _isDimMode ? 0.55 : 0.28),
           ),
         ),
         CustomScrollView(
@@ -1834,8 +1827,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                   },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 250),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
                         colors: [
@@ -1848,8 +1841,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color:
-                              CafeTheme.primaryGold.withValues(alpha: 0.3),
+                          color: CafeTheme.primaryGold.withValues(alpha: 0.3),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -1891,8 +1883,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
               builder: (context, snapshot) {
                 // ✦ fallback: لو مفيش order_count نجيب بدون ترتيب
                 if (snapshot.hasError ||
-                    (!snapshot.hasData && snapshot.connectionState ==
-                        ConnectionState.done)) {
+                    (!snapshot.hasData &&
+                        snapshot.connectionState == ConnectionState.done)) {
                   return StreamBuilder<QuerySnapshot>(
                     stream: FirebaseFirestore.instance
                         .collection('products')
@@ -1900,8 +1892,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                         .snapshots(),
                     builder: (context, snap2) {
                       if (!snap2.hasData) return const SizedBox();
-                      return _buildBestSellersHorizontalList(
-                          snap2.data!.docs);
+                      return _buildBestSellersHorizontalList(snap2.data!.docs);
                     },
                   );
                 }
@@ -1924,8 +1915,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildBestSellersHorizontalList(
-      List<QueryDocumentSnapshot> items) {
+  Widget _buildBestSellersHorizontalList(List<QueryDocumentSnapshot> items) {
     return ListView.builder(
       scrollDirection: Axis.horizontal,
       physics: const BouncingScrollPhysics(),
@@ -1933,271 +1923,258 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       itemCount: items.length,
       itemBuilder: (context, index) {
         var item = items[index].data() as Map<String, dynamic>;
-        String? imgUrl = item['image_url'];
-        bool hasImage = imgUrl != null && imgUrl.isNotEmpty;
-        bool hasSizes = item['sizes'] != null &&
-            (item['sizes'] as List).isNotEmpty;
-        String itemName = item['name'] ?? '';
-        int qtyInBasket = basket
-            .where(
-                (e) => (e['name'] as String).startsWith(itemName))
-            .fold(0, (s, e) => s + (e['quantity'] as int));
-        // ✦ عدد الطلبات الحقيقي
-        final orderCount =
-            (item['order_count'] as num?)?.toInt() ?? 0;
+        // ✦ [PERF] RepaintBoundary يعزل كل كارد في القائمة الأفقية
+        return RepaintBoundary(child: _buildBestSellerCard(item));
+      },
+    );
+  }
 
-        return GestureDetector(
-          onTap: () => _showAddDialog(item),
-          child: Container(
-            width: 148,
-            margin: const EdgeInsets.symmetric(horizontal: 7),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              gradient: const LinearGradient(
-                colors: [Color(0xFF2A1608), Color(0xFF160D03)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              border: Border.all(
-                color: qtyInBasket > 0
-                    ? CafeTheme.primaryGold
-                    : CafeTheme.primaryGold.withValues(alpha: 0.35),
-                width: qtyInBasket > 0 ? 2 : 1.2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color:
-                      CafeTheme.primaryGold.withValues(alpha: 0.12),
-                  blurRadius: 14,
-                  offset: const Offset(0, 5),
+  Widget _buildBestSellerCard(Map<String, dynamic> item) {
+    String? imgUrl = item['image_url'];
+    bool hasImage = imgUrl != null && imgUrl.isNotEmpty;
+    bool hasSizes = item['sizes'] != null && (item['sizes'] as List).isNotEmpty;
+    String itemName = item['name'] ?? '';
+    int qtyInBasket = basket
+        .where((e) => (e['name'] as String).startsWith(itemName))
+        .fold(0, (s, e) => s + (e['quantity'] as int));
+    // ✦ عدد الطلبات الحقيقي
+    final orderCount = (item['order_count'] as num?)?.toInt() ?? 0;
+
+    return GestureDetector(
+      onTap: () => _showAddDialog(item),
+      child: Container(
+        width: 148,
+        margin: const EdgeInsets.symmetric(horizontal: 7),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF2A1608), Color(0xFF160D03)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          border: Border.all(
+            color: qtyInBasket > 0
+                ? CafeTheme.primaryGold
+                : CafeTheme.primaryGold.withValues(alpha: 0.35),
+            width: qtyInBasket > 0 ? 2 : 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: CafeTheme.primaryGold.withValues(alpha: 0.12),
+              blurRadius: 14,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  flex: 6,
+                  child: ClipRRect(
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(24)),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        hasImage
+                            ? FastNetworkImage(
+                                url: imgUrl,
+                                fit: BoxFit.cover,
+                                cacheWidth: 300,
+                                cacheHeight: 300,
+                                placeholder: (c) =>
+                                    _bestSellerPlaceholder(item['name'] ?? ""),
+                              )
+                            : _bestSellerPlaceholder(item['name'] ?? ""),
+                        Positioned.fill(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.black.withValues(alpha: 0.55),
+                                ],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                stops: const [0.55, 1.0],
+                              ),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: CafeTheme.deepBrown.withValues(alpha: 0.9),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: CafeTheme.primaryGold
+                                    .withValues(alpha: 0.6),
+                                width: 0.8,
+                              ),
+                            ),
+                            child: Text(
+                              hasSizes
+                                  ? "✦ أحجام"
+                                  : "${item['price'] ?? '—'} ج",
+                              style: const TextStyle(
+                                color: CafeTheme.primaryGold,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                        // ✦ شارة عدد الطلبات الحقيقي
+                        if (orderCount > 0)
+                          Positioned(
+                            bottom: 8,
+                            left: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.65),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.local_fire_department_rounded,
+                                    color: Colors.orangeAccent,
+                                    size: 11,
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    "$orderCount طلب",
+                                    style: const TextStyle(
+                                      color: Colors.orangeAccent,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        // ✦ ميزة 2: زرار المفضلة
+                        Positioned(
+                          top: 8,
+                          left: 8,
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                if (_favorites.contains(itemName)) {
+                                  _favorites.remove(itemName);
+                                } else {
+                                  _favorites.add(itemName);
+                                }
+                              });
+                            },
+                            child: Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.5),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                _favorites.contains(itemName)
+                                    ? Icons.favorite_rounded
+                                    : Icons.favorite_border_rounded,
+                                color: _favorites.contains(itemName)
+                                    ? Colors.redAccent
+                                    : Colors.white54,
+                                size: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item['name'] ?? "",
+                            style: const TextStyle(
+                              color: CafeTheme.primaryGoldLight,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              height: 1.2,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                CafeTheme.primaryGold,
+                                CafeTheme.warmBrown
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.add_rounded,
+                              color: Colors.black, size: 18),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
-            child: Stack(
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      flex: 6,
-                      child: ClipRRect(
-                        borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(24)),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            hasImage
-                                ? FastNetworkImage(
-                                    url: imgUrl!,
-                                    fit: BoxFit.cover,
-                                    cacheWidth: 300,
-                                    cacheHeight: 300,
-                                    placeholder: (c) =>
-                                        _bestSellerPlaceholder(
-                                            item['name'] ?? ""),
-                                  )
-                                : _bestSellerPlaceholder(
-                                    item['name'] ?? ""),
-                            Positioned.fill(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Colors.transparent,
-                                      Colors.black
-                                          .withValues(alpha: 0.55),
-                                    ],
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    stops: const [0.55, 1.0],
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Positioned(
-                              top: 8,
-                              right: 8,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: CafeTheme.deepBrown
-                                      .withValues(alpha: 0.9),
-                                  borderRadius:
-                                      BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: CafeTheme.primaryGold
-                                        .withValues(alpha: 0.6),
-                                    width: 0.8,
-                                  ),
-                                ),
-                                child: Text(
-                                  hasSizes
-                                      ? "✦ أحجام"
-                                      : "${item['price'] ?? '—'} ج",
-                                  style: const TextStyle(
-                                    color: CafeTheme.primaryGold,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            // ✦ شارة عدد الطلبات الحقيقي
-                            if (orderCount > 0)
-                              Positioned(
-                                bottom: 8,
-                                left: 8,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black
-                                        .withValues(alpha: 0.65),
-                                    borderRadius:
-                                        BorderRadius.circular(10),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(
-                                        Icons.local_fire_department_rounded,
-                                        color: Colors.orangeAccent,
-                                        size: 11,
-                                      ),
-                                      const SizedBox(width: 3),
-                                      Text(
-                                        "$orderCount طلب",
-                                        style: const TextStyle(
-                                          color: Colors.orangeAccent,
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            // ✦ ميزة 2: زرار المفضلة
-                            Positioned(
-                              top: 8,
-                              left: 8,
-                              child: GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    if (_favorites
-                                        .contains(itemName)) {
-                                      _favorites.remove(itemName);
-                                    } else {
-                                      _favorites.add(itemName);
-                                    }
-                                  });
-                                },
-                                child: Container(
-                                  width: 28,
-                                  height: 28,
-                                  decoration: BoxDecoration(
-                                    color: Colors.black
-                                        .withValues(alpha: 0.5),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    _favorites.contains(itemName)
-                                        ? Icons.favorite_rounded
-                                        : Icons
-                                            .favorite_border_rounded,
-                                    color: _favorites
-                                            .contains(itemName)
-                                        ? Colors.redAccent
-                                        : Colors.white54,
-                                    size: 16,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+            // ✦ ميزة 3: عداد الكميات على الكارد
+            if (qtyInBasket > 0)
+              Positioned(
+                top: 0,
+                left: 0,
+                child: Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    color: CafeTheme.primaryGold,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(24),
+                      bottomRight: Radius.circular(12),
                     ),
-                    Expanded(
-                      flex: 3,
-                      child: Padding(
-                        padding:
-                            const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                        child: Row(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.center,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                item['name'] ?? "",
-                                style: const TextStyle(
-                                  color: CafeTheme.primaryGoldLight,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  height: 1.2,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Container(
-                              width: 30,
-                              height: 30,
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    CafeTheme.primaryGold,
-                                    CafeTheme.warmBrown
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius:
-                                    BorderRadius.circular(10),
-                              ),
-                              child: const Icon(Icons.add_rounded,
-                                  color: Colors.black, size: 18),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                // ✦ ميزة 3: عداد الكميات على الكارد
-                if (qtyInBasket > 0)
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    child: Container(
-                      width: 26,
-                      height: 26,
-                      decoration: BoxDecoration(
-                        color: CafeTheme.primaryGold,
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(24),
-                          bottomRight: Radius.circular(12),
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          "$qtyInBasket",
-                          style: const TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      "$qtyInBasket",
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
                       ),
                     ),
                   ),
-              ],
-            ),
-          ),
-        );
-      },
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -2593,6 +2570,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             .snapshots();
 
     return StreamBuilder<QuerySnapshot>(
+      key: ValueKey(
+          'products_${currentCat ?? "__all__"}_${_searchQuery.isNotEmpty ? "search" : ""}_${_showFavoritesOnly ? "fav" : ""}'),
       stream: stream,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
@@ -2663,7 +2642,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
                   var item = allItems[index].data() as Map<String, dynamic>;
-                  return _buildGridCard(item);
+                  // ✦ [PERF] RepaintBoundary يعزل كل كارد عن الباقي
+                  return RepaintBoundary(child: _buildGridCard(item));
                 },
                 childCount: allItems.length,
               ),
@@ -2678,7 +2658,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             delegate: SliverChildBuilderDelegate(
               (context, index) {
                 var item = allItems[index].data() as Map<String, dynamic>;
-                return _buildListCard(item);
+                // ✦ [PERF] RepaintBoundary يمنع إعادة رسم الكروت الأخرى عند scroll
+                return RepaintBoundary(child: _buildListCard(item));
               },
               childCount: allItems.length,
             ),
@@ -2734,7 +2715,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                   width: 90,
                   height: 90,
                   child: FastNetworkImage(
-                    url: imgUrl!,
+                    url: imgUrl ?? '',
                     fit: BoxFit.cover,
                     cacheWidth: 180,
                     cacheHeight: 180,
@@ -2909,7 +2890,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                         const BorderRadius.vertical(top: Radius.circular(22)),
                     child: hasImage
                         ? FastNetworkImage(
-                            url: imgUrl!,
+                            url: imgUrl ?? '',
                             fit: BoxFit.cover,
                             cacheWidth: 300,
                             cacheHeight: 300,
@@ -3666,8 +3647,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             .get();
         if (query.docs.isNotEmpty) {
           await query.docs.first.reference.update({
-            'order_count':
-                FieldValue.increment(item['quantity'] as int),
+            'order_count': FieldValue.increment(item['quantity'] as int),
           });
         }
       } catch (e) {
@@ -3958,8 +3938,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   // ✦ بانر ترحيبي ذكي
   // ==========================================
   Widget _buildWelcomeBanner() {
-    if (registeredName == null)
+    if (registeredName == null) {
       return const SliverToBoxAdapter(child: SizedBox());
+    }
     return SliverToBoxAdapter(
       child: Container(
         margin: const EdgeInsets.fromLTRB(18, 18, 18, 0),
@@ -4084,29 +4065,36 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           final productName = suggestion['name'] as String;
           final reason = suggestion['reason'] as String;
           final badge = suggestion['badge'] as String;
-          final timeLabel = suggestion['timeLabel'] as String;
           final weatherInfo = suggestion['weatherInfo'] as String;
 
           // ✦ إيموجي المنتج
           String productEmoji = _weatherEmoji;
-          if (productName.contains("قهوة") || productName.contains("اسبريسو") ||
-              productName.contains("كابتشينو") || productName.contains("موكا")) {
+          if (productName.contains("قهوة") ||
+              productName.contains("اسبريسو") ||
+              productName.contains("كابتشينو") ||
+              productName.contains("موكا")) {
             productEmoji = "☕";
-          } else if (productName.contains("لاتيه") || productName.contains("هوت")) {
-            productEmoji = (_weatherTemp != null && _weatherTemp! < 20) ? "☕" : "🥛";
+          } else if (productName.contains("لاتيه") ||
+              productName.contains("هوت")) {
+            productEmoji =
+                (_weatherTemp != null && _weatherTemp! < 20) ? "☕" : "🥛";
           } else if (productName.contains("شاي")) {
             productEmoji = "🍵";
-          } else if (productName.contains("عصير") || productName.contains("ليمون") ||
+          } else if (productName.contains("عصير") ||
+              productName.contains("ليمون") ||
               productName.contains("سموزي")) {
             productEmoji = "🍹";
           } else if (productName.contains("موهيتو")) {
             productEmoji = "🌿";
-          } else if (productName.contains("كولد") || productName.contains("آيس") ||
-              productName.contains("فرابتشينو") || productName.contains("مثلج")) {
+          } else if (productName.contains("كولد") ||
+              productName.contains("آيس") ||
+              productName.contains("فرابتشينو") ||
+              productName.contains("مثلج")) {
             productEmoji = "🧊";
           } else if (productName.contains("شوكولاتة")) {
             productEmoji = "🍫";
-          } else if (productName.contains("كيك") || productName.contains("حلى") ||
+          } else if (productName.contains("كيك") ||
+              productName.contains("حلى") ||
               productName.contains("ديزرت")) {
             productEmoji = "🍰";
           }
@@ -4139,8 +4127,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                   Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(productEmoji,
-                          style: const TextStyle(fontSize: 36)),
+                      Text(productEmoji, style: const TextStyle(fontSize: 36)),
                       if (weatherInfo.isNotEmpty)
                         Text(
                           weatherInfo,
