@@ -41,6 +41,68 @@ class CategoryIcons {
   }
 }
 
+// ==========================================
+// Optimized image widget - lightweight & smooth
+// ==========================================
+class FastNetworkImage extends StatefulWidget {
+  final String url;
+  final BoxFit fit;
+  final Widget Function(BuildContext) placeholder;
+  final int? cacheWidth;
+  final int? cacheHeight;
+  const FastNetworkImage({
+    super.key,
+    required this.url,
+    this.fit = BoxFit.cover,
+    required this.placeholder,
+    this.cacheWidth,
+    this.cacheHeight,
+  });
+  @override
+  State<FastNetworkImage> createState() => _FastNetworkImageState();
+}
+
+class _FastNetworkImageState extends State<FastNetworkImage>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _fadeCtrl;
+  late Animation<double> _fadeAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    );
+    _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeIn);
+  }
+
+  @override
+  void dispose() {
+    _fadeCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.network(
+      widget.url,
+      fit: widget.fit,
+      cacheWidth: widget.cacheWidth ?? 400,
+      cacheHeight: widget.cacheHeight ?? 400,
+      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+        if (wasSynchronouslyLoaded) return child;
+        if (frame != null) {
+          _fadeCtrl.forward();
+          return FadeTransition(opacity: _fadeAnim, child: child);
+        }
+        return widget.placeholder(context);
+      },
+      errorBuilder: (c, e, s) => widget.placeholder(c),
+    );
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
@@ -148,8 +210,25 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   // ✦ ميزة 4: وضع العرض
   bool _isGridView = false;
 
+  // ✦ ميزة جديدة 1: عداد الوقت (clock) يُعرض في الهيدر
+  String _currentTime = "";
+  // ✦ ميزة جديدة 2: تتبع آخر صنف تم إضافته (toast أنيق)
+  String? _lastAddedItem;
+  // ✦ ميزة جديدة 3: وضع المظهر الليلي الإضافي (تعتيم أكثر)
+  bool _isDimMode = false;
+  // ✦ ميزة جديدة 4: العروض والخصومات بانر دوّار
+  int _promoBannerIndex = 0;
+  final List<String> _promoMessages = [
+    "☕ اشرب قهوتك بكل راحة ✨",
+    "🔥 جرب الأكثر طلباً النهارده!",
+    "🎉 اطلب أكتر من 3 أصناف واستمتع بتجربة مميزة",
+    "⭐ رأيك يهمنا - شاركنا تقييمك",
+    "💛 storm | تجربة الرفاهية الحقيقية",
+  ];
+
   late AnimationController _glowController;
   late AnimationController _devPulseController;
+  late AnimationController _promoController;
 
   final TextEditingController _noteController = TextEditingController();
   final TextEditingController _nameEntryController = TextEditingController();
@@ -167,12 +246,44 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
+
+    // ✦ ميزة جديدة 1: ساعة حية
+    _updateTime();
+    Future.doWhile(() async {
+      await Future.delayed(const Duration(seconds: 30));
+      if (!mounted) return false;
+      _updateTime();
+      return true;
+    });
+
+    // ✦ ميزة جديدة 4: بانر عروض دوّار
+    _promoController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    Future.doWhile(() async {
+      await Future.delayed(const Duration(seconds: 4));
+      if (!mounted) return false;
+      _promoController.forward(from: 0);
+      setState(() {
+        _promoBannerIndex = (_promoBannerIndex + 1) % _promoMessages.length;
+      });
+      return true;
+    });
+  }
+
+  void _updateTime() {
+    final now = DateTime.now();
+    final h = now.hour.toString().padLeft(2, '0');
+    final m = now.minute.toString().padLeft(2, '0');
+    setState(() => _currentTime = "$h:$m");
   }
 
   @override
   void dispose() {
     _glowController.dispose();
     _devPulseController.dispose();
+    _promoController.dispose();
     _noteController.dispose();
     _nameEntryController.dispose();
     _tableEntryController.dispose();
@@ -818,7 +929,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
             child: Container(
-              color: Colors.black.withValues(alpha: 0.18),
+              color: Colors.black.withValues(alpha: _isDimMode ? 0.45 : 0.18),
             ),
           ),
         ),
@@ -827,6 +938,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           slivers: [
             _buildAppBar(),
             _buildWelcomeBanner(),
+            // ✦ ميزة جديدة 4: بانر العروض الدوّار
+            _buildPromoBanner(),
             _buildKitchenStatusBanner(),
             _buildDailySpecial(),
             _buildBestSellers(),
@@ -838,8 +951,128 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             const SliverToBoxAdapter(child: SizedBox(height: 350)),
           ],
         ),
+        // ✦ ميزة جديدة 2: toast آخر صنف مضاف
+        if (_lastAddedItem != null)
+          Positioned(
+            bottom: 130,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: 1.0),
+                duration: const Duration(milliseconds: 400),
+                curve: Curves.elasticOut,
+                builder: (context, v, child) => Transform.scale(
+                  scale: v,
+                  child: child,
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [
+                        CafeTheme.primaryGold,
+                        CafeTheme.warmBrown,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: CafeTheme.primaryGold.withValues(alpha: 0.4),
+                        blurRadius: 16,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.check_circle_rounded,
+                          color: Colors.black, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'أُضيف: $_lastAddedItem ✨',
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         _buildBottomActionArea(),
       ],
+    );
+  }
+
+  // ✦ ميزة جديدة 4: بانر العروض الدوّار
+  Widget _buildPromoBanner() {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        child: AnimatedBuilder(
+          animation: _promoController,
+          builder: (context, child) => Opacity(
+            opacity: (1.0 - _promoController.value * 0.5).clamp(0.0, 1.0),
+            child: Transform.translate(
+              offset: Offset(0, _promoController.value * -4),
+              child: child,
+            ),
+          ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  CafeTheme.primaryGold.withValues(alpha: 0.12),
+                  CafeTheme.warmBrown.withValues(alpha: 0.08),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: CafeTheme.primaryGold.withValues(alpha: 0.25),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.campaign_rounded,
+                    color: CafeTheme.primaryGold, size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _promoMessages[_promoBannerIndex],
+                    style: const TextStyle(
+                      color: CafeTheme.primaryGoldLight,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: CafeTheme.primaryGold.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    "${_promoBannerIndex + 1}/${_promoMessages.length}",
+                    style: const TextStyle(
+                      color: CafeTheme.primaryGold,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -899,7 +1132,17 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         title: Column(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            buildstormLogo(size: 40),
+            GestureDetector(
+              onTap: () {
+                try {
+                  js.context.callMethod(
+                      'eval', ['window.location.reload();']);
+                } catch (e) {
+                  debugPrint("Reload error: $e");
+                }
+              },
+              child: buildstormLogo(size: 40),
+            ),
             const SizedBox(height: 5),
             const Text(
               "storm",
@@ -959,6 +1202,52 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             ),
           ),
         _buildWaiterButton(),
+        // ✦ ميزة جديدة 1: ساعة + ميزة جديدة 3: وضع التعتيم
+        Padding(
+          padding: const EdgeInsets.only(left: 10, top: 12, right: 4),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              GestureDetector(
+                onTap: () => setState(() => _isDimMode = !_isDimMode),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: _isDimMode
+                        ? CafeTheme.primaryGold.withValues(alpha: 0.2)
+                        : Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: _isDimMode
+                          ? CafeTheme.primaryGold
+                          : Colors.white10,
+                    ),
+                  ),
+                  child: Icon(
+                    _isDimMode
+                        ? Icons.brightness_3_rounded
+                        : Icons.brightness_6_rounded,
+                    color: _isDimMode
+                        ? CafeTheme.primaryGold
+                        : Colors.white38,
+                    size: 14,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 2),
+              if (_currentTime.isNotEmpty)
+                Text(
+                  _currentTime,
+                  style: const TextStyle(
+                    color: CafeTheme.primaryGold,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -1312,10 +1601,12 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                                       fit: StackFit.expand,
                                       children: [
                                         hasImage
-                                            ? Image.network(
-                                                imgUrl!,
+                                            ? FastNetworkImage(
+                                                url: imgUrl!,
                                                 fit: BoxFit.cover,
-                                                errorBuilder: (c, e, s) =>
+                                                cacheWidth: 300,
+                                                cacheHeight: 300,
+                                                placeholder: (c) =>
                                                     _bestSellerPlaceholder(
                                                         item['name'] ?? ""),
                                               )
@@ -1533,6 +1824,149 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
             if (mounted) setState(() => currentCat = cats.first['name']);
           });
         }
+
+        // ==========================================
+        // دالة فتح ويندو اختيار القسم
+        // ==========================================
+        void showCategoryPicker() {
+          showModalBottomSheet(
+            context: context,
+            backgroundColor: Colors.transparent,
+            isScrollControlled: true,
+            builder: (ctx) => BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(
+                constraints: const BoxConstraints(maxHeight: 520),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF180E04),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(30)),
+                  border: Border.all(
+                    color: CafeTheme.primaryGold.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 12),
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: CafeTheme.primaryGold.withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      "اختار القسم",
+                      style: TextStyle(
+                        color: CafeTheme.primaryGold,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Flexible(
+                      child: GridView.builder(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          childAspectRatio: 2.8,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                        ),
+                        itemCount: cats.length + 1,
+                        itemBuilder: (ctx2, i) {
+                          bool isAll = i == 0;
+                          String catN =
+                              isAll ? "__all__" : cats[i - 1]['name'] ?? "";
+                          bool isSelected = currentCat == catN;
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() => currentCat = catN);
+                              Navigator.pop(ctx);
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 220),
+                              decoration: BoxDecoration(
+                                gradient: isSelected
+                                    ? const LinearGradient(
+                                        colors: [
+                                          CafeTheme.primaryGold,
+                                          CafeTheme.warmBrown
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      )
+                                    : null,
+                                color: isSelected
+                                    ? null
+                                    : Colors.white.withValues(alpha: 0.06),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? CafeTheme.primaryGold
+                                      : CafeTheme.warmBrown
+                                          .withValues(alpha: 0.3),
+                                  width: 1.2,
+                                ),
+                                boxShadow: isSelected
+                                    ? [
+                                        BoxShadow(
+                                          color: CafeTheme.primaryGold
+                                              .withValues(alpha: 0.4),
+                                          blurRadius: 10,
+                                        )
+                                      ]
+                                    : null,
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    isAll
+                                        ? Icons.grid_view_rounded
+                                        : CategoryIcons.resolve(catN),
+                                    color: isSelected
+                                        ? Colors.black87
+                                        : CafeTheme.primaryGold
+                                            .withValues(alpha: 0.7),
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Flexible(
+                                    child: Text(
+                                      isAll ? "كل الأقسام" : catN,
+                                      style: TextStyle(
+                                        color: isSelected
+                                            ? Colors.black87
+                                            : Colors.white70,
+                                        fontSize: 13,
+                                        fontWeight: isSelected
+                                            ? FontWeight.w800
+                                            : FontWeight.w500,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
         return SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.only(top: 20, bottom: 8),
@@ -1547,7 +1981,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                   if (index == 0) {
                     bool isAllSelected = currentCat == "__all__";
                     return GestureDetector(
-                      onTap: () => setState(() => currentCat = "__all__"),
+                      onTap: showCategoryPicker,
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 280),
                         curve: Curves.easeInOut,
@@ -1884,11 +2318,19 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 child: SizedBox(
                   width: 90,
                   height: 90,
-                  child: Image.network(
-                    imgUrl!,
+                  child: FastNetworkImage(
+                    url: imgUrl!,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) =>
-                        const SizedBox.shrink(),
+                    cacheWidth: 180,
+                    cacheHeight: 180,
+                    placeholder: (c) => Container(
+                      color: const Color(0xFF2A1608),
+                      child: Icon(
+                        CategoryIcons.resolve(itemName),
+                        color: CafeTheme.primaryGold.withValues(alpha: 0.4),
+                        size: 28,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -2051,10 +2493,12 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                     borderRadius:
                         const BorderRadius.vertical(top: Radius.circular(22)),
                     child: hasImage
-                        ? Image.network(
-                            imgUrl!,
+                        ? FastNetworkImage(
+                            url: imgUrl!,
                             fit: BoxFit.cover,
-                            errorBuilder: (c, e, s) =>
+                            cacheWidth: 300,
+                            cacheHeight: 300,
+                            placeholder: (c) =>
                                 _bestSellerPlaceholder(itemName),
                           )
                         : _bestSellerPlaceholder(itemName),
@@ -2304,6 +2748,11 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                           'quantity': 1,
                         });
                       }
+                      // ✦ ميزة جديدة 2: toast آخر صنف مضاف
+                      _lastAddedItem = item['name'] ?? itemName;
+                      Future.delayed(const Duration(seconds: 2), () {
+                        if (mounted) setState(() => _lastAddedItem = null);
+                      });
                     });
                     Navigator.pop(context);
                   },
@@ -2348,8 +2797,160 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _buildActiveOrdersTracker(),
+                  // ✦ ميزة جديدة 5: مشاركة المنيو + تقييم سريع
+                  _buildQuickShareRateBar(),
                   _buildBasketRow(),
                   _buildCheckoutBar(),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ✦ ميزة جديدة 5: شريط مشاركة وتقييم سريع
+  Widget _buildQuickShareRateBar() {
+    if (basket.isEmpty) return const SizedBox();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                try {
+                  final url = Uri.base.toString();
+                  js.context.callMethod('eval', [
+                    'if(navigator.share){navigator.share({title:"storm",url:"$url"});}else{navigator.clipboard.writeText("$url");}'
+                  ]);
+                } catch (e) {
+                  debugPrint("Share error: $e");
+                }
+                _showStatusSnackBar("تم نسخ رابط المنيو! 🔗", CafeTheme.warmBrown);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 9),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: CafeTheme.warmBrown.withValues(alpha: 0.3)),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.share_rounded, color: CafeTheme.primaryGold, size: 16),
+                    SizedBox(width: 6),
+                    Text("شارك المنيو", style: TextStyle(color: Colors.white60, fontSize: 12, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: GestureDetector(
+              onTap: _showQuickRatingDialog,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 9),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: CafeTheme.warmBrown.withValues(alpha: 0.3)),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.star_rounded, color: CafeTheme.primaryGold, size: 16),
+                    SizedBox(width: 6),
+                    Text("قيّم تجربتك", style: TextStyle(color: Colors.white60, fontSize: 12, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showQuickRatingDialog() {
+    int localRating = 0;
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSt) => BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Dialog(
+            backgroundColor: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.all(28),
+              constraints: const BoxConstraints(maxWidth: 320),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1E1008), Color(0xFF0D0804)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: CafeTheme.primaryGold.withValues(alpha: 0.35)),
+                boxShadow: [BoxShadow(color: CafeTheme.primaryGold.withValues(alpha: 0.1), blurRadius: 30)],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  buildstormLogo(size: 50),
+                  const SizedBox(height: 12),
+                  const Text("كيف تجربتك معنا؟",
+                      style: TextStyle(color: CafeTheme.primaryGold, fontSize: 18, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 6),
+                  const Text("رأيك يهمنا جداً ✨",
+                      style: TextStyle(color: Colors.white38, fontSize: 12)),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (i) {
+                      return GestureDetector(
+                        onTap: () => setSt(() => localRating = i + 1),
+                        child: AnimatedScale(
+                          scale: localRating >= i + 1 ? 1.25 : 1.0,
+                          duration: const Duration(milliseconds: 200),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 5),
+                            child: Icon(
+                              localRating >= i + 1 ? Icons.star_rounded : Icons.star_border_rounded,
+                              color: localRating >= i + 1 ? CafeTheme.primaryGold : Colors.white24,
+                              size: 38,
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 20),
+                  if (localRating > 0)
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: CafeTheme.primaryGold,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _showStatusSnackBar(
+                            localRating >= 4
+                                ? "شكراً على تقييمك الرائع! 🌟"
+                                : "شكراً، سنحاول التحسين دائماً 🙏",
+                            localRating >= 4 ? CafeTheme.primaryGold : Colors.orangeAccent,
+                          );
+                        },
+                        child: const Text("إرسال التقييم",
+                            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 15)),
+                      ),
+                    ),
                 ],
               ),
             ),
