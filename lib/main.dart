@@ -7,7 +7,6 @@ import 'dart:js' as js;
 
 import 'firebase_options.dart';
 import 'services/api_service.dart';
-import 'storm_chatbot.dart'; // ✦ AI Chatbot
 
 // ==========================================
 // Singleton ApiService
@@ -187,9 +186,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 
   // ✦ عدد الأكثر طلباً المعروض (قابل للتوسيع بالسهم)
   int _bestSellersLimit = 5;
-
-  // ✦ قائمة الأكثر طلباً — يستخدمها الـ Chatbot
-  List<Map<String, dynamic>> _topProductsForChat = [];
 
   // ✦ ميزة جديدة 1: عداد الوقت (clock) يُعرض في الهيدر
   String _currentTime = "";
@@ -1300,45 +1296,33 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
               ),
             ),
           ),
-        // ✦ AI Chatbot — شريط ذكي ثابت في الأسفل
-        if (_isEntryComplete)
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: StormChatbot(
-              topProducts: _topProductsForChat,
-              customerName: registeredName,
-              onAddToBasket: (product) {
-                setState(() {
-                  final name = product['name'] ?? '';
-                  final price = (product['price'] is num)
-                      ? (product['price'] as num).toDouble()
-                      : double.tryParse(product['price']?.toString() ?? '0') ??
-                          0.0;
-                  final idx = basket.indexWhere(
-                    (b) => b['name'] == name && b['note'] == 'بدون إضافات',
-                  );
-                  if (idx != -1) {
-                    basket[idx]['quantity']++;
-                  } else {
-                    basket.add({
-                      'name': name,
-                      'price': price,
-                      'image_url': product['image_url'] ?? '',
-                      'note': 'بدون إضافات',
-                      'quantity': 1,
-                    });
-                  }
-                  _lastAddedItem = name;
-                  Future.delayed(const Duration(seconds: 2), () {
-                    if (mounted) setState(() => _lastAddedItem = null);
-                  });
-                });
-              },
-            ),
-          ),
         _buildBottomActionArea(),
+        // ==========================================
+        // 🤖 Storm AI Chatbot — Gemini
+        // ==========================================
+        if (_isEntryComplete)
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('products')
+                .limit(80)
+                .snapshots(),
+            builder: (context, snap) {
+              final items = snap.hasData
+                  ? snap.data!.docs
+                      .map((d) => d.data() as Map<String, dynamic>)
+                      .toList()
+                  : <Map<String, dynamic>>[];
+              return _StormChatBot(
+                menuItems: items,
+                geminiApiKey:
+                    "AIzaSyD7TcJK73kmWD0SpSuFGmoxubfCHDZuXbA", // ← غيّر ده
+                weatherTemp: _weatherTemp,
+                weatherCondition: _weatherCondition,
+                weatherEmoji: _weatherEmoji,
+                customerName: registeredName,
+              );
+            },
+          ),
       ],
     );
   }
@@ -1958,16 +1942,6 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   }
 
   Widget _buildBestSellersHorizontalList(List<QueryDocumentSnapshot> items) {
-    // ✦ حفظ الأكثر طلباً للـ Chatbot
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        setState(() {
-          _topProductsForChat = items
-              .map((d) => {'id': d.id, ...d.data() as Map<String, dynamic>})
-              .toList();
-        });
-      }
-    });
     return ListView.builder(
       scrollDirection: Axis.horizontal,
       physics: const BouncingScrollPhysics(),
@@ -5153,6 +5127,621 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
                   fontSize: 16,
                 ),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// 🤖 Storm AI Chatbot — Gemini 1.5 Flash
+// خفيف | بدون packages جديدة | يستخدم dart:js الموجود أصلاً
+// ============================================================
+
+class _ChatMessage {
+  final String text;
+  final bool isBot;
+  _ChatMessage({required this.text, required this.isBot});
+}
+
+class _StormChatBot extends StatefulWidget {
+  final List<Map<String, dynamic>> menuItems;
+  final String geminiApiKey;
+  final double? weatherTemp;
+  final String weatherCondition;
+  final String weatherEmoji;
+  final String? customerName;
+
+  const _StormChatBot({
+    required this.menuItems,
+    required this.geminiApiKey,
+    this.weatherTemp,
+    this.weatherCondition = "",
+    this.weatherEmoji = "🌤️",
+    this.customerName,
+  });
+
+  @override
+  State<_StormChatBot> createState() => _StormChatBotState();
+}
+
+class _StormChatBotState extends State<_StormChatBot>
+    with TickerProviderStateMixin {
+  bool _isOpen = false;
+  bool _isLoading = false;
+  bool _canSend = true;
+  final List<_ChatMessage> _messages = [];
+  final TextEditingController _inputCtrl = TextEditingController();
+  final ScrollController _scrollCtrl = ScrollController();
+
+  late AnimationController _bubbleAnim;
+  late AnimationController _slideCtrl;
+  late Animation<Offset> _slideAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _bubbleAnim = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+
+    _slideCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0, 1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _slideCtrl, curve: Curves.easeOutCubic));
+
+    _messages.add(_ChatMessage(text: _welcomeMessage, isBot: true));
+  }
+
+  @override
+  void dispose() {
+    _bubbleAnim.dispose();
+    _slideCtrl.dispose();
+    _inputCtrl.dispose();
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
+  // ── رسالة ترحيب ذكية ──
+  String get _welcomeMessage {
+    final name =
+        widget.customerName != null ? " يا ${widget.customerName}" : "";
+    final hour = DateTime.now().hour;
+    final greeting = hour < 12
+        ? "صباح الخير$name ☀️"
+        : hour < 17
+            ? "أهلاً$name 😊"
+            : "مساء النور$name 🌙";
+
+    String hint = "";
+    if (widget.weatherTemp != null) {
+      final t = widget.weatherTemp!;
+      if (t > 28) {
+        hint =
+            "\nالجو حار ${widget.weatherEmoji} — قولي مزاجك وأنا أقترح عليك أحسن مشروب يبردك! 🧊";
+      } else if (t < 18) {
+        hint = "\nالجو برد ${widget.weatherEmoji} — أقترح عليك حاجة تدفيك؟ ☕";
+      } else {
+        hint = "\nالجو تمام ${widget.weatherEmoji}";
+      }
+    }
+    return "$greeting\nأنا ستورم — مساعدك الذكي في Storm Café ✨$hint\n\nقولي إيه مزاجك وأنا أختارلك الأنسب! 🎯";
+  }
+
+  // ── System Prompt للـ Gemini ──
+  String get _systemPrompt {
+    final hour = DateTime.now().hour;
+    final timeSlot = hour < 10
+        ? "الصبح"
+        : hour < 14
+            ? "الضهر"
+            : hour < 19
+                ? "بعد الضهر"
+                : hour < 23
+                    ? "المساء"
+                    : "الليل";
+
+    final weatherStr = widget.weatherTemp != null
+        ? "درجة الحرارة: ${widget.weatherTemp!.toStringAsFixed(0)}°م — الحالة: ${widget.weatherCondition} ${widget.weatherEmoji}"
+        : "الطقس: غير محدد";
+
+    final menuStr = widget.menuItems
+        .take(70)
+        .map((item) =>
+            "• ${item['name'] ?? ''} (${item['category'] ?? ''}) — ${item['price'] ?? '—'} ج.م")
+        .join('\n');
+
+    return '''
+أنت "ستورم"، مساعد ذكي لكافيه Storm Café الفاخر في مصر.
+بتتكلم عربي مصري لطيف ومختصر.
+
+الوقت: $timeSlot | $weatherStr
+العميل: ${widget.customerName ?? 'ضيف كريم'}
+
+المنيو:
+$menuStr
+
+قواعد صارمة:
+١. اقترح فقط من المنيو المذكور.
+٢. لو الجو حار → اقترح باردة. لو بارد → اقترح ساخنة.
+٣. ردودك قصيرة جداً (جملتين أو 3 بالكتير).
+٤. لو الصنف مش في المنيو → "مش عندنا للأسف".
+٥. لا تتكلم في أي موضوع خارج المنيو والطلبات.
+٦. لو اختار صنف قوله: "اختار ده من المنيو وضيفه للسلة 🛒".
+''';
+  }
+
+  // ── استدعاء Gemini عبر JS fetch ──
+  Future<String> _callGemini(String userMessage) async {
+    // بناء history (آخر 6 رسايل فقط)
+    final history = <Map<String, dynamic>>[];
+    final recent = _messages.length > 7
+        ? _messages.sublist(_messages.length - 6)
+        : _messages.skip(1).toList();
+    for (final m in recent) {
+      history.add({
+        'role': m.isBot ? 'model' : 'user',
+        'parts': [
+          {'text': m.text}
+        ],
+      });
+    }
+    history.add({
+      'role': 'user',
+      'parts': [
+        {'text': userMessage}
+      ],
+    });
+
+    final bodyMap = {
+      'system_instruction': {
+        'parts': [
+          {'text': _systemPrompt}
+        ]
+      },
+      'contents': history,
+      'generationConfig': {
+        'maxOutputTokens': 180,
+        'temperature': 0.7,
+      },
+    };
+
+    // نظف الـ key القديم
+    js.context['_stormChatReply'] = null;
+    js.context['_stormChatError'] = null;
+
+    final bodyJson = bodyMap
+        .toString()
+        .replaceAll("'", '"')
+        .replaceAll('true', 'true')
+        .replaceAll('false', 'false');
+
+    // نستخدم JSON.stringify عبر JS عشان نتأكد من الـ encoding
+    js.context['_stormChatBody'] = _jsonEncode(bodyMap);
+
+    final url =
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${widget.geminiApiKey}';
+
+    js.context.callMethod('eval', [
+      '''
+      (async function() {
+        try {
+          const body = window._stormChatBody;
+          const res = await fetch("$url", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: body
+          });
+          const data = await res.json();
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "معلش حصل خطأ ✨";
+          window._stormChatReply = text;
+        } catch(e) {
+          window._stormChatError = "خطأ في الاتصال: " + e.toString();
+        }
+      })();
+    '''
+    ]);
+
+    // انتظار النتيجة
+    for (int i = 0; i < 40; i++) {
+      await Future.delayed(const Duration(milliseconds: 250));
+      final reply = js.context['_stormChatReply'];
+      final error = js.context['_stormChatError'];
+      if (reply != null && reply.toString().isNotEmpty) {
+        js.context['_stormChatReply'] = null;
+        return reply.toString();
+      }
+      if (error != null) {
+        js.context['_stormChatError'] = null;
+        return "معلش في مشكلة في الاتصال، حاول تاني 🙏";
+      }
+    }
+    return "استغرق وقت أطول من المعتاد.. حاول تاني ✨";
+  }
+
+  // ── JSON encode بسيط بدون import إضافي ──
+  String _jsonEncode(dynamic obj) {
+    if (obj is Map) {
+      final pairs = obj.entries
+          .map((e) => '"${e.key}": ${_jsonEncode(e.value)}')
+          .join(', ');
+      return '{$pairs}';
+    } else if (obj is List) {
+      return '[${obj.map(_jsonEncode).join(', ')}]';
+    } else if (obj is String) {
+      final escaped = obj
+          .replaceAll('\\', '\\\\')
+          .replaceAll('"', '\\"')
+          .replaceAll('\n', '\\n')
+          .replaceAll('\r', '\\r')
+          .replaceAll('\t', '\\t');
+      return '"$escaped"';
+    } else if (obj is bool) {
+      return obj ? 'true' : 'false';
+    } else if (obj == null) {
+      return 'null';
+    }
+    return obj.toString();
+  }
+
+  void _sendMessage() async {
+    final text = _inputCtrl.text.trim();
+    if (text.isEmpty || _isLoading || !_canSend) return;
+
+    _canSend = false;
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) _canSend = true;
+    });
+
+    setState(() {
+      _messages.add(_ChatMessage(text: text, isBot: false));
+      _isLoading = true;
+    });
+    _inputCtrl.clear();
+    _scrollToBottom();
+
+    try {
+      final reply = await _callGemini(text);
+      if (!mounted) return;
+      setState(() {
+        _messages.add(_ChatMessage(text: reply, isBot: true));
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _messages
+            .add(_ChatMessage(text: "معلش حصل خطأ غير متوقع 😔", isBot: true));
+        _isLoading = false;
+      });
+    }
+    _scrollToBottom();
+  }
+
+  void _scrollToBottom() {
+    Future.delayed(const Duration(milliseconds: 120), () {
+      if (_scrollCtrl.hasClients) {
+        _scrollCtrl.animateTo(
+          _scrollCtrl.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  void _toggleChat() {
+    setState(() => _isOpen = !_isOpen);
+    if (_isOpen) {
+      _slideCtrl.forward();
+    } else {
+      _slideCtrl.reverse();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Stack(
+        children: [
+          if (_isOpen)
+            Positioned(
+              bottom: 90,
+              left: 12,
+              right: 12,
+              child: SlideTransition(
+                position: _slideAnim,
+                child: _chatWindow(),
+              ),
+            ),
+          Positioned(
+            bottom: 22,
+            left: 18,
+            child: _floatingButton(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _floatingButton() {
+    return AnimatedBuilder(
+      animation: _bubbleAnim,
+      builder: (context, _) => GestureDetector(
+        onTap: _toggleChat,
+        child: Container(
+          width: 58,
+          height: 58,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(
+              colors: [CafeTheme.primaryGold, CafeTheme.warmBrown],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: CafeTheme.primaryGold
+                    .withValues(alpha: 0.25 + 0.35 * _bubbleAnim.value),
+                blurRadius: 14 + 10 * _bubbleAnim.value,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+          child: Icon(
+            _isOpen ? Icons.close_rounded : Icons.smart_toy_rounded,
+            color: Colors.black,
+            size: 26,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _chatWindow() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(26),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          constraints: const BoxConstraints(maxHeight: 460),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A1008).withValues(alpha: 0.96),
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(
+              color: CafeTheme.primaryGold.withValues(alpha: 0.3),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.55),
+                blurRadius: 30,
+                spreadRadius: 4,
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _header(),
+              Flexible(child: _messageList()),
+              if (_isLoading) _typingIndicator(),
+              _inputBar(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _header() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            CafeTheme.primaryGold.withValues(alpha: 0.18),
+            Colors.transparent,
+          ],
+          begin: Alignment.centerRight,
+          end: Alignment.centerLeft,
+        ),
+        border: Border(
+          bottom: BorderSide(
+            color: CafeTheme.primaryGold.withValues(alpha: 0.18),
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [CafeTheme.primaryGold, CafeTheme.warmBrown],
+              ),
+            ),
+            child: const Icon(Icons.smart_toy_rounded,
+                color: Colors.black, size: 20),
+          ),
+          const SizedBox(width: 10),
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "ستورم AI ✨",
+                style: TextStyle(
+                  color: CafeTheme.primaryGold,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+              Text(
+                "مساعدك الذكي",
+                style: TextStyle(color: Colors.white54, fontSize: 11),
+              ),
+            ],
+          ),
+          const Spacer(),
+          Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(
+              color: Colors.greenAccent,
+              shape: BoxShape.circle,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _messageList() {
+    return ListView.builder(
+      controller: _scrollCtrl,
+      padding: const EdgeInsets.all(12),
+      itemCount: _messages.length,
+      itemBuilder: (context, i) => _bubble(_messages[i]),
+    );
+  }
+
+  Widget _bubble(_ChatMessage msg) {
+    return Align(
+      alignment: msg.isBot ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        constraints: const BoxConstraints(maxWidth: 280),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          gradient: msg.isBot
+              ? LinearGradient(
+                  colors: [
+                    CafeTheme.primaryGold.withValues(alpha: 0.14),
+                    CafeTheme.warmBrown.withValues(alpha: 0.09),
+                  ],
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
+                )
+              : null,
+          color: msg.isBot ? null : const Color(0xFF2A1A0A),
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(18),
+            topRight: const Radius.circular(18),
+            bottomLeft: msg.isBot
+                ? const Radius.circular(4)
+                : const Radius.circular(18),
+            bottomRight: msg.isBot
+                ? const Radius.circular(18)
+                : const Radius.circular(4),
+          ),
+          border: Border.all(
+            color: msg.isBot
+                ? CafeTheme.primaryGold.withValues(alpha: 0.22)
+                : Colors.white.withValues(alpha: 0.07),
+          ),
+        ),
+        child: Text(
+          msg.text,
+          style: TextStyle(
+            color: msg.isBot ? Colors.white : Colors.white70,
+            fontSize: 13,
+            height: 1.55,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _typingIndicator() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.smart_toy_rounded,
+              color: CafeTheme.primaryGold, size: 15),
+          const SizedBox(width: 6),
+          Text(
+            "ستورم بيفكر...",
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.45),
+              fontSize: 12,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+          const SizedBox(width: 6),
+          const SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: CafeTheme.primaryGold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _inputBar() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: CafeTheme.primaryGold.withValues(alpha: 0.14)),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: CafeTheme.primaryGold.withValues(alpha: 0.2),
+                ),
+              ),
+              child: TextField(
+                controller: _inputCtrl,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+                decoration: const InputDecoration(
+                  hintText: "اكتب طلبك أو مزاجك...",
+                  hintStyle: TextStyle(color: Colors.white38, fontSize: 13),
+                  border: InputBorder.none,
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                ),
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => _sendMessage(),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: _sendMessage,
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [CafeTheme.primaryGold, CafeTheme.warmBrown],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child:
+                  const Icon(Icons.send_rounded, color: Colors.black, size: 18),
             ),
           ),
         ],
