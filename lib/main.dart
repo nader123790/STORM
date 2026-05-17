@@ -5444,8 +5444,8 @@ $menuSummary
               body: window._stormReqBody,
             });
             const data = await res.json();
-            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'عندي مشكلة صغيرة دلوقتي، جرب تاني! 🙏';
-            window._stormAiResponse = text;
+            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'لسا بنشتغل على المساعد الذكي علشنراحتك تهمنا😊❤️';
+            window._stormAiResponse = text
           } catch(e) {
             window._stormAiResponse = 'حصل خطأ في الاتصال، جرب تاني! 🙏';
           }
@@ -5465,7 +5465,7 @@ $menuSummary
         }
       }
 
-      return result ?? 'عندي مشكلة صغيرة دلوقتي، جرب تاني! 🙏';
+      return result ?? 'لسا شغاليت على المساعد الذكي علشان راحتك تهمنا ❤️😊🙏';
     } catch (e) {
       return 'حصل خطأ في الاتصال، جرب تاني! 🙏';
     }
