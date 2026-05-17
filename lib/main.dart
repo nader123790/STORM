@@ -5447,44 +5447,136 @@ class _StormChatBotState extends State<_StormChatBot>
     _scrollToBottom();
   }
 
+  // ── كلمات مفتاحية للمشروبات الساخنة ──
+  static const List<String> _hotKeywords = [
+    "اسبريسو",
+    "espresso",
+    "قهوة تركي",
+    "تركي",
+    "امريكانو",
+    "americano",
+    "لاتيه",
+    "latte",
+    "كابتشينو",
+    "cappuccino",
+    "ماكياتو",
+    "macchiato",
+    "موكا",
+    "mocha",
+    "شاي",
+    "tea",
+    "كركديه",
+    "نعناع",
+    "قرفة",
+    "هوت",
+    "hot",
+    "ساخن",
+    "دافي",
+    "كاكاو",
+    "cocoa",
+    "شوكولاتة ساخنة",
+    "هرب",
+    "herb",
+    "قهوة فلتر",
+    "filter coffee",
+    "كورتادو",
+    "cortado",
+    "ريستريتو",
+    "ristretto",
+    "كافيه",
+    "caffe",
+    "قهوة",
+  ];
+
+  // ── كلمات مفتاحية للمشروبات الباردة ──
+  static const List<String> _coldKeywords = [
+    "آيس",
+    "ايس",
+    "ice",
+    "فرابتشينو",
+    "frappuccino",
+    "فرابتشيلو",
+    "كولد برو",
+    "cold brew",
+    "كولد",
+    "cold",
+    "ملك شيك",
+    "ملكه شيك",
+    "milkshake",
+    "shake",
+    "موهيتو",
+    "mojito",
+    "سموزي",
+    "smoothie",
+    "عصير",
+    "juice",
+    "ليمون",
+    "lemonade",
+    "مانجو",
+    "فراولة",
+    "برتقال",
+    "ساقع",
+    "بارد",
+    "غازي",
+    "سودا",
+    "soda",
+    "كوكتيل",
+    "cocktail",
+    "بوبل تي",
+    "bubble tea",
+    "أوريو",
+    "نوتيلا شيك",
+  ];
+
+  bool _isHotCategory(String name) {
+    final n = name.toLowerCase();
+    for (final kw in _hotKeywords) {
+      if (n.contains(kw)) return true;
+    }
+    return false;
+  }
+
+  bool _isColdCategory(String name) {
+    final n = name.toLowerCase();
+    for (final kw in _coldKeywords) {
+      if (n.contains(kw)) return true;
+    }
+    return false;
+  }
+
   // ── فلترة الأقسام ──
   List<Map<String, dynamic>> _filterCategories() {
     if (_allCategories.isEmpty) {
-      // Fallback — أقسام جامدة لو Firebase فاشل
       return _buildFallbackCategories();
     }
 
     return _allCategories.where((cat) {
-      final name = (cat['name'] ?? '').toString().toLowerCase();
+      final name = (cat['name'] ?? '').toString();
 
       if (_intent.contains("مشروب")) {
-        // استبعد أكل وحلويات
-        final isFood = name.contains("ساندوتش") ||
-            name.contains("طعام") ||
-            name.contains("وجبة") ||
-            name.contains("بيتزا") ||
-            name.contains("توست");
-        final isSweet = name.contains("كيك") ||
-            name.contains("ديزرت") ||
-            name.contains("حلى") ||
-            name.contains("وافل") ||
-            name.contains("بان كيك");
+        final nameLower = name.toLowerCase();
+        final isFood = nameLower.contains("ساندوتش") ||
+            nameLower.contains("طعام") ||
+            nameLower.contains("وجبة") ||
+            nameLower.contains("بيتزا") ||
+            nameLower.contains("توست");
+        final isSweet = nameLower.contains("كيك") ||
+            nameLower.contains("ديزرت") ||
+            nameLower.contains("حلى") ||
+            nameLower.contains("وافل") ||
+            nameLower.contains("بان كيك");
         if (isFood || isSweet) return false;
 
-        // لو بارد → استبعد أقسام الساخن الواضحة
-        if (_tempPref == "بارد") {
-          if (name.contains("هوت") || name.contains("ساخن")) return false;
-        }
-        // لو ساخن → استبعد أقسام الباردة الواضحة
         if (_tempPref == "ساخن") {
-          if (name.contains("آيس") ||
-              name.contains("فرابتشينو") ||
-              name.contains("كولد") ||
-              name.contains("عصير") ||
-              name.contains("موهيتو")) {
-            return false;
-          }
+          if (_isColdCategory(name)) return false;
+          return true;
         }
+
+        if (_tempPref == "بارد") {
+          if (_isHotCategory(name)) return false;
+          return true;
+        }
+
         return true;
       }
 
@@ -5528,10 +5620,31 @@ class _StormChatBotState extends State<_StormChatBot>
         {'name': 'وجبات', 'icon': '🍽️'},
       ];
     }
+    // مشروبات — بنفرق حسب اختيار الدرجة
+    if (_tempPref == "ساخن") {
+      return [
+        {'name': 'اسبريسو', 'icon': '☕'},
+        {'name': 'قهوة تركي', 'icon': '☕'},
+        {'name': 'لاتيه وكابتشينو', 'icon': '☕'},
+        {'name': 'شاي', 'icon': '🍵'},
+        {'name': 'هوت شوكولاتة', 'icon': '🍫'},
+      ];
+    }
+    if (_tempPref == "بارد") {
+      return [
+        {'name': 'آيس كوفي', 'icon': '🧊'},
+        {'name': 'فرابتشينو', 'icon': '🥤'},
+        {'name': 'ملك شيك', 'icon': '🥛'},
+        {'name': 'موهيتو', 'icon': '🍹'},
+        {'name': 'عصائر', 'icon': '🍊'},
+        {'name': 'مشروبات غازية', 'icon': '🫧'},
+      ];
+    }
     return [
-      {'name': 'قهوة', 'icon': '☕'},
+      {'name': 'قهوة ساخنة', 'icon': '☕'},
       {'name': 'مشروبات باردة', 'icon': '🧊'},
       {'name': 'شاي', 'icon': '🍵'},
+      {'name': 'عصائر', 'icon': '🍊'},
     ];
   }
 
