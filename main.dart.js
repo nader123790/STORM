@@ -94552,7 +94552,7 @@ p=4
 h=$.nd()
 h.m(0,"_stormReqBody",l)
 h.m(0,"_stormApiUrl",J.cE(m))
-h.jI("eval",["        (async function() {\n          try {\n            const res = await fetch(window._stormApiUrl, {\n              method: 'POST',\n              headers: {'Content-Type': 'application/json'},\n              body: window._stormReqBody,\n            });\n            const data = await res.json();\n            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '\u0639\u0646\u062f\u064a \u0645\u0634\u0643\u0644\u0629 \u0635\u063a\u064a\u0631\u0629 \u062f\u0644\u0648\u0642\u062a\u064a\u060c \u062c\u0631\u0628 \u062a\u0627\u0646\u064a! \ud83d\ude4f';\n            window._stormAiResponse = text;\n          } catch(e) {\n            window._stormAiResponse = '\u062d\u0635\u0644 \u062e\u0637\u0623 \u0641\u064a \u0627\u0644\u0627\u062a\u0635\u0627\u0644\u060c \u062c\u0631\u0628 \u062a\u0627\u0646\u064a! \ud83d\ude4f';\n          }\n        })();\n      "])
+h.jI("eval",["        (async function() {\n          try {\n            const res = await fetch(window._stormApiUrl, {\n              method: 'POST',\n              headers: {'Content-Type': 'application/json'},\n              body: window._stormReqBody,\n            });\n            const data = await res.json();\n            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '\u0644\u0633\u0627 \u0628\u0646\u0634\u062a\u063a\u0644 \u0639\u0644\u0649 \u0627\u0644\u0645\u0633\u0627\u0639\u062f \u0627\u0644\u0630\u0643\u064a \u0639\u0644\u0634\u0646\u0631\u0627\u062d\u062a\u0643 \u062a\u0647\u0645\u0646\u0627\ud83d\ude0a\u2764\ufe0f';\n            window._stormAiResponse = text\n          } catch(e) {\n            window._stormAiResponse = '\u062d\u0635\u0644 \u062e\u0637\u0623 \u0641\u064a \u0627\u0644\u0627\u062a\u0635\u0627\u0644\u060c \u062c\u0631\u0628 \u062a\u0627\u0646\u064a! \ud83d\ude4f';\n          }\n        })();\n      "])
 k=null
 j=0
 case 7:if(!(j<60)){s=9
@@ -94566,7 +94566,7 @@ break}case 8:++j
 s=7
 break
 case 9:h=k
-if(h==null)h="\u0639\u0646\u062f\u064a \u0645\u0634\u0643\u0644\u0629 \u0635\u063a\u064a\u0631\u0629 \u062f\u0644\u0648\u0642\u062a\u064a\u060c \u062c\u0631\u0628 \u062a\u0627\u0646\u064a! \ud83d\ude4f"
+if(h==null)h="\u0644\u0633\u0627 \u0634\u063a\u0627\u0644\u064a\u062a \u0639\u0644\u0649 \u0627\u0644\u0645\u0633\u0627\u0639\u062f \u0627\u0644\u0630\u0643\u064a \u0639\u0644\u0634\u0627\u0646 \u0631\u0627\u062d\u062a\u0643 \u062a\u0647\u0645\u0646\u0627 \u2764\ufe0f\ud83d\ude0a\ud83d\ude4f"
 q=h
 s=1
 break
