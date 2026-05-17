@@ -3,8 +3,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'dart:ui';
 import 'dart:convert';
+import 'dart:async';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:js' as js;
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 
 import 'firebase_options.dart';
 import 'services/api_service.dart';
@@ -232,12 +235,12 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     _devPulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
+    );
 
     // ✦ ميزة جديدة 1: ساعة حية
     _updateTime();
     Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 30));
+      await Future.delayed(const Duration(seconds: 60));
       if (!mounted) return false;
       _updateTime();
       return true;
@@ -249,7 +252,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 600),
     );
     Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 4));
+      await Future.delayed(const Duration(seconds: 8));
       if (!mounted) return false;
       _promoController.forward(from: 0);
       setState(() {
@@ -627,6 +630,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   }
 
   void _showDeveloperContact() {
+    _devPulseController.repeat(reverse: true);
     showDialog(
       context: context,
       builder: (context) => BackdropFilter(
@@ -821,7 +825,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
           ),
         ),
       ),
-    );
+    ).then((_) => _devPulseController.stop());
   }
 
   Widget _devContactTile(
@@ -5175,7 +5179,7 @@ class _StormChatBotState extends State<_StormChatBot>
     _bubbleAnim = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
+    );
 
     _slideCtrl = AnimationController(
       vsync: this,
@@ -5212,26 +5216,26 @@ class _StormChatBotState extends State<_StormChatBot>
 
   String get _welcomeMessage {
     final name =
-        widget.customerName != null ? " يا \${widget.customerName}" : "";
+        widget.customerName != null ? " يا ${widget.customerName}" : "";
     final hour = DateTime.now().hour;
     final greeting = hour < 12
-        ? "صباح الخير\$name ☀️"
+        ? "صباح الخير$name ☀️"
         : hour < 17
-            ? "أهلاً\$name 😊"
-            : "مساء النور\$name 🌙";
+            ? "أهلاً$name 😊"
+            : "مساء النور$name 🌙";
     String hint = "";
     if (widget.weatherTemp != null) {
       final t = widget.weatherTemp!;
       if (t > 28) {
         hint =
-            "\nالجو حار \${widget.weatherEmoji} — قولي مزاجك وأنا أقترح عليك حاجة تبردك! 🧊";
+            "\nالجو حار ${widget.weatherEmoji} — قولي مزاجك وأنا أقترح عليك حاجة تبردك! 🧊";
       } else if (t < 18) {
-        hint = "\nالجو برد \${widget.weatherEmoji} — أقترح عليك حاجة تدفيك؟ ☕";
+        hint = "\nالجو برد ${widget.weatherEmoji} — أقترح عليك حاجة تدفيك؟ ☕";
       } else {
-        hint = "\nالجو تمام \${widget.weatherEmoji}";
+        hint = "\nالجو تمام ${widget.weatherEmoji}";
       }
     }
-    return "\$greeting\nأنا ستورم — مساعدك الذكي في Storm Café ✨\$hint\n\nقولي إيه مزاجك وأنا أختارلك الأنسب! 🎯";
+    return "$greeting\nأنا ستورم — مساعدك الذكي في Storm Café ✨$hint\n\nقولي إيه مزاجك وأنا أختارلك الأنسب! 🎯";
   }
 
   String _buildSystemPrompt() {
@@ -5246,18 +5250,18 @@ class _StormChatBotState extends State<_StormChatBot>
                     ? "المساء"
                     : "الليل";
     final weatherStr = widget.weatherTemp != null
-        ? "\${widget.weatherTemp!.toStringAsFixed(0)}°م — \${widget.weatherCondition} \${widget.weatherEmoji}"
+        ? "${widget.weatherTemp!.toStringAsFixed(0)}°م — ${widget.weatherCondition} ${widget.weatherEmoji}"
         : "غير محدد";
     final menuStr = _menuCache.isEmpty
         ? "المنيو لم يُحمَّل بعد"
         : _menuCache
             .take(60)
             .map((item) =>
-                "• \${item['name'] ?? ''} — \${item['price'] ?? '—'} ج.م")
+                "• ${item['name'] ?? ''} — ${item['price'] ?? '—'} ج.م")
             .join('\n');
     return "أنت ستورم، مساعد Storm Café. بتتكلم عربي مصري مختصر.\n"
-        "الوقت: \$timeSlot | الطقس: \$weatherStr | العميل: \${widget.customerName ?? 'ضيف'}\n"
-        "المنيو:\n\$menuStr\n\n"
+        "الوقت: $timeSlot | الطقس: $weatherStr | العميل: ${widget.customerName ?? 'ضيف'}\n"
+        "المنيو:\n$menuStr\n\n"
         "قواعد: اقترح فقط من المنيو. لو حار اقترح باردة. لو بارد اقترح ساخنة. "
         "ردود قصيرة جملتين بالكتير. مش في المنيو قول مش عندنا للأسف. "
         "لو اختار قوله اختار ده من المنيو وضيفه للسلة.";
@@ -5294,50 +5298,28 @@ class _StormChatBotState extends State<_StormChatBot>
       'generationConfig': {'maxOutputTokens': 150, 'temperature': 0.7},
     });
 
-    final callId = DateTime.now().millisecondsSinceEpoch.toString();
-    final replyKey = 'sr\$callId';
-    final errKey = 'se\$callId';
-    final bodyKey = 'sb\$callId';
-
-    js.context[replyKey] = null;
-    js.context[errKey] = null;
-    js.context[bodyKey] = body;
-
     final url = 'https://generativelanguage.googleapis.com/v1beta/'
-        'models/gemini-1.5-flash:generateContent?key=\${widget.geminiApiKey}';
+        'models/gemini-1.5-flash:generateContent?key=${widget.geminiApiKey}';
 
-    js.context.callMethod('eval', [
-      'fetch("\$url",{method:"POST",headers:{"Content-Type":"application/json"},body:window["\$bodyKey"]})'
-          '.then(function(r){return r.json();})'
-          '.then(function(d){'
-          'var t=d&&d.candidates&&d.candidates[0]&&d.candidates[0].content&&'
-          'd.candidates[0].content.parts&&d.candidates[0].content.parts[0]&&'
-          'd.candidates[0].content.parts[0].text;'
-          'window["\$replyKey"]=t||"معلش مفيش رد";'
-          'window["\$bodyKey"]=null;'
-          '})'
-          '.catch(function(e){window["\$errKey"]=e.toString();window["\$bodyKey"]=null;});'
-    ]);
+    try {
+      final response = await html.HttpRequest.request(
+        url,
+        method: 'POST',
+        requestHeaders: {'Content-Type': 'application/json'},
+        sendData: body,
+      ).timeout(const Duration(seconds: 15));
 
-    int waited = 0;
-    int delay = 250;
-    while (waited < 12000) {
-      await Future.delayed(Duration(milliseconds: delay));
-      waited += delay;
-      if (delay < 700) delay = (delay * 1.35).toInt();
-
-      final reply = js.context[replyKey];
-      final err = js.context[errKey];
-      if (reply != null) {
-        js.context[replyKey] = null;
-        return reply.toString();
+      final data = jsonDecode(response.responseText ?? '{}');
+      final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'];
+      return text?.toString() ?? "معلش مفيش رد 🙏";
+    } on html.ProgressEvent catch (_) {
+      return "في مشكلة في الاتصال، حاول تاني 🙏";
+    } catch (e) {
+      if (e.toString().contains('TimeoutException')) {
+        return "الاتصال اتأخر، حاول تاني ✨";
       }
-      if (err != null) {
-        js.context[errKey] = null;
-        return "في مشكلة في الاتصال، حاول تاني 🙏";
-      }
+      return "في مشكلة، حاول تاني 🙏";
     }
-    return "استغرق وقت طويل، حاول تاني ✨";
   }
 
   void _sendMessage() async {
@@ -5383,7 +5365,12 @@ class _StormChatBotState extends State<_StormChatBot>
   }
 
   void _toggleChat() async {
-    if (!_isOpen) _loadMenuOnce();
+    if (!_isOpen) {
+      _loadMenuOnce();
+      _bubbleAnim.repeat(reverse: true);
+    } else {
+      _bubbleAnim.stop();
+    }
     setState(() => _isOpen = !_isOpen);
     if (_isOpen) {
       _slideCtrl.forward();
