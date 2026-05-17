@@ -7,6 +7,7 @@ import 'dart:js' as js;
 
 import 'firebase_options.dart';
 import 'services/api_service.dart';
+import 'storm_chatbot.dart'; // ✦ AI Chatbot
 
 // ==========================================
 // Singleton ApiService
@@ -186,6 +187,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 
   // ✦ عدد الأكثر طلباً المعروض (قابل للتوسيع بالسهم)
   int _bestSellersLimit = 5;
+
+  // ✦ قائمة الأكثر طلباً — يستخدمها الـ Chatbot
+  List<Map<String, dynamic>> _topProductsForChat = [];
 
   // ✦ ميزة جديدة 1: عداد الوقت (clock) يُعرض في الهيدر
   String _currentTime = "";
@@ -1296,6 +1300,44 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
               ),
             ),
           ),
+        // ✦ AI Chatbot — شريط ذكي ثابت في الأسفل
+        if (_isEntryComplete)
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: StormChatbot(
+              topProducts: _topProductsForChat,
+              customerName: registeredName,
+              onAddToBasket: (product) {
+                setState(() {
+                  final name = product['name'] ?? '';
+                  final price = (product['price'] is num)
+                      ? (product['price'] as num).toDouble()
+                      : double.tryParse(product['price']?.toString() ?? '0') ??
+                          0.0;
+                  final idx = basket.indexWhere(
+                    (b) => b['name'] == name && b['note'] == 'بدون إضافات',
+                  );
+                  if (idx != -1) {
+                    basket[idx]['quantity']++;
+                  } else {
+                    basket.add({
+                      'name': name,
+                      'price': price,
+                      'image_url': product['image_url'] ?? '',
+                      'note': 'بدون إضافات',
+                      'quantity': 1,
+                    });
+                  }
+                  _lastAddedItem = name;
+                  Future.delayed(const Duration(seconds: 2), () {
+                    if (mounted) setState(() => _lastAddedItem = null);
+                  });
+                });
+              },
+            ),
+          ),
         _buildBottomActionArea(),
       ],
     );
@@ -1916,6 +1958,16 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   }
 
   Widget _buildBestSellersHorizontalList(List<QueryDocumentSnapshot> items) {
+    // ✦ حفظ الأكثر طلباً للـ Chatbot
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {
+          _topProductsForChat = items
+              .map((d) => {'id': d.id, ...d.data() as Map<String, dynamic>})
+              .toList();
+        });
+      }
+    });
     return ListView.builder(
       scrollDirection: Axis.horizontal,
       physics: const BouncingScrollPhysics(),
