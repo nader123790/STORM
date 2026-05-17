@@ -3,8 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'dart:ui';
 import 'dart:convert';
+import 'dart:async';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:js' as js;
+import 'dart:math' as math;
 
 import 'firebase_options.dart';
 import 'services/api_service.dart';
@@ -19,24 +21,66 @@ final ApiService apiService = ApiService();
 // ==========================================
 class CategoryIcons {
   static IconData resolve(String name) {
-    if (name.contains("قهوة") ||
-        name.contains("اسبريسو") ||
-        name.contains("كوفي")) {
+    final n = name.toLowerCase();
+    if (n.contains("قهوة") ||
+        n.contains("اسبريسو") ||
+        n.contains("كوفي") ||
+        n.contains("لاتيه") ||
+        n.contains("كابتشينو") ||
+        n.contains("امريكانو") ||
+        n.contains("موكا") ||
+        n.contains("coffee")) {
       return Icons.coffee_rounded;
-    } else if (name.contains("عصير") ||
-        name.contains("موهيتو") ||
-        name.contains("مشروب")) {
+    } else if (n.contains("آيس") ||
+        n.contains("ice") ||
+        n.contains("كولد") ||
+        n.contains("فرابتشينو") ||
+        n.contains("cold brew")) {
+      return Icons.ac_unit_rounded;
+    } else if (n.contains("عصير") ||
+        n.contains("juice") ||
+        n.contains("ليمون") ||
+        n.contains("برتقال") ||
+        n.contains("مانجو") ||
+        n.contains("فراولة")) {
       return Icons.local_drink_rounded;
-    } else if (name.contains("حلى") ||
-        name.contains("كيك") ||
-        name.contains("ديزرت")) {
+    } else if (n.contains("موهيتو") ||
+        n.contains("كوكتيل") ||
+        n.contains("سموزي") ||
+        n.contains("smoothie") ||
+        n.contains("mojito")) {
+      return Icons.blender_rounded;
+    } else if (n.contains("حلى") ||
+        n.contains("كيك") ||
+        n.contains("ديزرت") ||
+        n.contains("تشيز") ||
+        n.contains("حلويات") ||
+        n.contains("وافل") ||
+        n.contains("بان كيك") ||
+        n.contains("dessert")) {
       return Icons.cake_rounded;
-    } else if (name.contains("شاي")) {
+    } else if (n.contains("شاي") ||
+        n.contains("tea") ||
+        n.contains("كركديه") ||
+        n.contains("نعناع") ||
+        n.contains("أخضر")) {
       return Icons.emoji_food_beverage_rounded;
-    } else if (name.contains("ساندوتش") ||
-        name.contains("طعام") ||
-        name.contains("أكل")) {
+    } else if (n.contains("ساندوتش") ||
+        n.contains("توست") ||
+        n.contains("برجر") ||
+        n.contains("بيتزا") ||
+        n.contains("طعام") ||
+        n.contains("وجبة")) {
       return Icons.lunch_dining_rounded;
+    } else if (n.contains("شوكولاتة") ||
+        n.contains("كاكاو") ||
+        n.contains("chocolate")) {
+      return Icons.nightlight_round;
+    } else if (n.contains("ماء") ||
+        n.contains("water") ||
+        n.contains("سودا") ||
+        n.contains("مياه")) {
+      return Icons.water_drop_rounded;
     }
     return Icons.local_cafe_rounded;
   }
@@ -212,6 +256,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   late AnimationController _glowController;
   late AnimationController _devPulseController;
   late AnimationController _promoController;
+  Timer? _clockTimer;
+  Timer? _promoTimer;
 
   final TextEditingController _noteController = TextEditingController();
   final TextEditingController _nameEntryController = TextEditingController();
@@ -234,29 +280,24 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 1500),
     );
 
-    // ✦ ميزة جديدة 1: ساعة حية
+    // ✦ ساعة حية — Timer أخف بكثير من Future.doWhile
     _updateTime();
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 60));
-      if (!mounted) return false;
-      _updateTime();
-      return true;
+    _clockTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) _updateTime();
     });
 
-    // ✦ ميزة جديدة 4: بانر عروض دوّار
-    _promoController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 8));
-      if (!mounted) return false;
+    // ✦ بانر عروض دوّار — Timer أخف
+    _promoTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (!mounted) return;
       _promoController.forward(from: 0);
       setState(() {
         _promoBannerIndex = (_promoBannerIndex + 1) % _promoMessages.length;
       });
-      return true;
     });
+    _promoController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
   }
 
   void _updateTime() {
@@ -528,6 +569,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _clockTimer?.cancel();
+    _promoTimer?.cancel();
     _glowController.dispose();
     _devPulseController.dispose();
     _promoController.dispose();
@@ -1383,13 +1426,21 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   }
 
   Widget _buildAppBar() {
+    // ✦ Responsive sizing بناءً على عرض الشاشة
+    final screenW = MediaQuery.of(context).size.width;
+    final isSmall = screenW < 360;
+    final iconBtnSize = isSmall ? 40.0 : 46.0;
+    final iconSize = isSmall ? 16.0 : 19.0;
+    final labelFontSize = isSmall ? 7.5 : 9.0;
+
     return SliverAppBar(
-      expandedHeight: 180,
+      expandedHeight: 150,
       backgroundColor: CafeTheme.surface,
       surfaceTintColor: Colors.transparent,
       pinned: true,
       elevation: 0,
-      leadingWidth: 150,
+      toolbarHeight: 70,
+      leadingWidth: isSmall ? 110 : 130,
       leading: Center(
         child: ScaleTransition(
           scale: Tween(begin: 0.95, end: 1.05).animate(
@@ -1409,20 +1460,20 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                   color: CafeTheme.primaryGold.withValues(alpha: 0.3),
                 ),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
                     Icons.code_rounded,
                     color: CafeTheme.primaryGold,
-                    size: 20,
+                    size: isSmall ? 16 : 20,
                   ),
-                  SizedBox(width: 4),
+                  SizedBox(width: isSmall ? 3 : 4),
                   Text(
-                    "تواصل مع المطور",
+                    isSmall ? "المطور" : "تواصل مع المطور",
                     style: TextStyle(
                       color: CafeTheme.primaryGold,
-                      fontSize: 9,
+                      fontSize: labelFontSize,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -1468,48 +1519,14 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
         ),
       ),
       actions: [
-        if (registeredName != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: GestureDetector(
-              onTap: _showChangeTableDialog,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.07),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: CafeTheme.warmBrown.withValues(alpha: 0.5),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.table_restaurant_rounded,
-                      color: CafeTheme.primaryGold,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      "طاولة $currentTable",
-                      style: const TextStyle(
-                        color: CafeTheme.primaryGold,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        _buildWaiterButton(),
-        // ✦ ميزة جديدة 1: ساعة + ميزة جديدة 3: وضع التعتيم
+        _buildWaiterButton(
+            iconBtnSize: iconBtnSize,
+            iconSize: iconSize,
+            labelFontSize: labelFontSize),
+        // ✦ ساعة + وضع التعتيم
         Padding(
-          padding: const EdgeInsets.only(left: 10, top: 12, right: 4),
+          padding: EdgeInsets.only(
+              left: isSmall ? 6 : 8, right: isSmall ? 6 : 8, top: 6, bottom: 6),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -1517,36 +1534,65 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                 onTap: () => setState(() => _isDimMode = !_isDimMode),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
-                  padding: const EdgeInsets.all(6),
+                  width: iconBtnSize,
+                  height: iconBtnSize,
                   decoration: BoxDecoration(
-                    color: _isDimMode
-                        ? CafeTheme.primaryGold.withValues(alpha: 0.2)
-                        : Colors.white.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color:
-                          _isDimMode ? CafeTheme.primaryGold : Colors.white10,
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: _isDimMode
+                          ? [
+                              CafeTheme.primaryGold.withValues(alpha: 0.35),
+                              CafeTheme.warmBrown.withValues(alpha: 0.5),
+                            ]
+                          : [
+                              Colors.white.withValues(alpha: 0.06),
+                              Colors.white.withValues(alpha: 0.03),
+                            ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
+                    border: Border.all(
+                      color: _isDimMode
+                          ? CafeTheme.primaryGold.withValues(alpha: 0.7)
+                          : Colors.white.withValues(alpha: 0.15),
+                      width: 1.5,
+                    ),
+                    boxShadow: _isDimMode
+                        ? [
+                            BoxShadow(
+                              color:
+                                  CafeTheme.primaryGold.withValues(alpha: 0.2),
+                              blurRadius: 8,
+                            )
+                          ]
+                        : null,
                   ),
-                  child: Icon(
-                    _isDimMode
-                        ? Icons.brightness_3_rounded
-                        : Icons.brightness_6_rounded,
-                    color: _isDimMode ? CafeTheme.primaryGold : Colors.white38,
-                    size: 14,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        _isDimMode
+                            ? Icons.brightness_3_rounded
+                            : Icons.brightness_6_rounded,
+                        color:
+                            _isDimMode ? CafeTheme.primaryGold : Colors.white38,
+                        size: iconSize,
+                      ),
+                      if (_currentTime.isNotEmpty)
+                        Text(
+                          _currentTime,
+                          style: TextStyle(
+                            color: _isDimMode
+                                ? CafeTheme.primaryGold
+                                : Colors.white38,
+                            fontSize: isSmall ? 7 : 8,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(height: 2),
-              if (_currentTime.isNotEmpty)
-                Text(
-                  _currentTime,
-                  style: const TextStyle(
-                    color: CafeTheme.primaryGold,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
             ],
           ),
         ),
@@ -1554,44 +1600,110 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildWaiterButton() {
+  Widget _buildWaiterButton(
+      {double iconBtnSize = 46,
+      double iconSize = 19,
+      double labelFontSize = 9}) {
     return Padding(
-      padding: const EdgeInsets.only(left: 15, top: 15),
-      child: GestureDetector(
-        onTap: _callWaiter,
-        child: AnimatedBuilder(
-          animation: _glowController,
-          builder: (context, child) => Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.6),
-              borderRadius: BorderRadius.circular(25),
-              border: Border.all(
-                color: CafeTheme.primaryGold.withValues(
-                  alpha: 0.4 + (0.6 * _glowController.value),
+      padding: const EdgeInsets.only(left: 10, top: 6, bottom: 6),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // ── زرار نداء الويتر ──
+          GestureDetector(
+            onTap: _callWaiter,
+            child: AnimatedBuilder(
+              animation: _glowController,
+              builder: (context, child) => Container(
+                width: iconBtnSize,
+                height: iconBtnSize,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [
+                      CafeTheme.primaryGold.withValues(
+                          alpha: 0.25 + 0.25 * _glowController.value),
+                      CafeTheme.warmBrown.withValues(alpha: 0.4),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  border: Border.all(
+                    color: CafeTheme.primaryGold
+                        .withValues(alpha: 0.5 + 0.5 * _glowController.value),
+                    width: 1.8,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: CafeTheme.primaryGold.withValues(
+                          alpha: 0.15 + 0.2 * _glowController.value),
+                      blurRadius: 10,
+                      spreadRadius: 1,
+                    ),
+                  ],
                 ),
-                width: 2,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      _isWaiterAlertActive
+                          ? Icons.hourglass_top_rounded
+                          : Icons.notifications_active_rounded,
+                      color: CafeTheme.primaryGold,
+                      size: iconSize,
+                    ),
+                    Text(
+                      _isWaiterAlertActive ? "جاري" : "نداء",
+                      style: TextStyle(
+                        color: CafeTheme.primaryGold,
+                        fontSize: labelFontSize - 1,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            child: Row(
-              children: [
-                Text(
-                  _isWaiterAlertActive ? "جاري.." : "نداء",
-                  style: const TextStyle(
-                    color: CafeTheme.primaryGold,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
+          ),
+          const SizedBox(height: 4),
+          // ── زرار تغيير الطاولة ──
+          if (registeredName != null)
+            GestureDetector(
+              onTap: _showChangeTableDialog,
+              child: Container(
+                width: iconBtnSize,
+                height: 28,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: CafeTheme.primaryGold.withValues(alpha: 0.12),
+                  border: Border.all(
+                    color: CafeTheme.primaryGold.withValues(alpha: 0.35),
+                    width: 1,
                   ),
                 ),
-                const Icon(
-                  Icons.notifications_active_rounded,
-                  color: CafeTheme.primaryGold,
-                  size: 18,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.table_restaurant_rounded,
+                      color: CafeTheme.primaryGold,
+                      size: iconSize - 5,
+                    ),
+                    Text(
+                      "$currentTable",
+                      style: TextStyle(
+                        color: CafeTheme.primaryGold,
+                        fontSize: labelFontSize - 1,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
-        ),
+        ],
       ),
     );
   }
@@ -1602,146 +1714,55 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   Widget _buildSearchAndFilterBar() {
     return SliverToBoxAdapter(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
         child: Column(
           children: [
             Row(
               children: [
-                // زرار البحث
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _showSearch = !_showSearch;
-                      if (!_showSearch) {
-                        _searchQuery = "";
-                        _searchController.clear();
-                      }
-                    });
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: _showSearch
-                          ? CafeTheme.primaryGold.withValues(alpha: 0.2)
-                          : Colors.white.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: _showSearch
-                            ? CafeTheme.primaryGold
-                            : CafeTheme.warmBrown.withValues(alpha: 0.3),
-                        width: 1.2,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.search_rounded,
-                          color: _showSearch
-                              ? CafeTheme.primaryGold
-                              : Colors.white54,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          "بحث",
-                          style: TextStyle(
-                            color: _showSearch
-                                ? CafeTheme.primaryGold
-                                : Colors.white54,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                // ── زرار البحث ──
+                _filterChip(
+                  icon: Icons.search_rounded,
+                  label: "بحث",
+                  active: _showSearch,
+                  activeColor: CafeTheme.primaryGold,
+                  onTap: () => setState(() {
+                    _showSearch = !_showSearch;
+                    if (!_showSearch) {
+                      _searchQuery = "";
+                      _searchController.clear();
+                    }
+                  }),
                 ),
                 const SizedBox(width: 8),
-                // ✦ ميزة 2: زرار المفضلة
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _showFavoritesOnly = !_showFavoritesOnly;
-                    });
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: _showFavoritesOnly
-                          ? Colors.red.withValues(alpha: 0.2)
-                          : Colors.white.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: _showFavoritesOnly
-                            ? Colors.redAccent
-                            : CafeTheme.warmBrown.withValues(alpha: 0.3),
-                        width: 1.2,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _showFavoritesOnly
-                              ? Icons.favorite_rounded
-                              : Icons.favorite_border_rounded,
-                          color: _showFavoritesOnly
-                              ? Colors.redAccent
-                              : Colors.white54,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          "المفضلة",
-                          style: TextStyle(
-                            color: _showFavoritesOnly
-                                ? Colors.redAccent
-                                : Colors.white54,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        if (_favorites.isNotEmpty) ...[
-                          const SizedBox(width: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.redAccent,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              "${_favorites.length}",
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
+                // ── زرار المفضلة ──
+                _filterChipWithBadge(
+                  icon: _showFavoritesOnly
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  label: "المفضلة",
+                  active: _showFavoritesOnly,
+                  activeColor: Colors.redAccent,
+                  badge: _favorites.isNotEmpty ? "${_favorites.length}" : null,
+                  onTap: () =>
+                      setState(() => _showFavoritesOnly = !_showFavoritesOnly),
                 ),
                 const Spacer(),
-                // ✦ ميزة 4: تبديل العرض Grid/List
+                // ── تبديل العرض ──
                 GestureDetector(
-                  onTap: () {
-                    setState(() => _isGridView = !_isGridView);
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
+                  onTap: () => setState(() => _isGridView = !_isGridView),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(14),
+                      shape: BoxShape.circle,
+                      color: _isGridView
+                          ? CafeTheme.primaryGold.withValues(alpha: 0.18)
+                          : Colors.white.withValues(alpha: 0.05),
                       border: Border.all(
-                        color: CafeTheme.warmBrown.withValues(alpha: 0.3),
+                        color: _isGridView
+                            ? CafeTheme.primaryGold.withValues(alpha: 0.6)
+                            : CafeTheme.warmBrown.withValues(alpha: 0.3),
                         width: 1.2,
                       ),
                     ),
@@ -1749,8 +1770,9 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                       _isGridView
                           ? Icons.view_list_rounded
                           : Icons.grid_view_rounded,
-                      color: CafeTheme.primaryGold,
-                      size: 20,
+                      color:
+                          _isGridView ? CafeTheme.primaryGold : Colors.white54,
+                      size: 18,
                     ),
                   ),
                 ),
@@ -1767,7 +1789,8 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                         controller: _searchController,
                         autofocus: true,
                         onChanged: (v) => setState(() => _searchQuery = v),
-                        style: const TextStyle(color: Colors.white),
+                        style:
+                            const TextStyle(color: Colors.white, fontSize: 14),
                         textAlign: TextAlign.right,
                         decoration: InputDecoration(
                           hintText: "ابحث عن أي صنف...",
@@ -1777,29 +1800,145 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                               color: CafeTheme.primaryGold, size: 20),
                           suffixIcon: _searchQuery.isNotEmpty
                               ? GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      _searchQuery = "";
-                                      _searchController.clear();
-                                    });
-                                  },
+                                  onTap: () => setState(() {
+                                    _searchQuery = "";
+                                    _searchController.clear();
+                                  }),
                                   child: const Icon(Icons.close_rounded,
                                       color: Colors.white38, size: 18),
                                 )
                               : null,
                           filled: true,
                           fillColor: Colors.white.withValues(alpha: 0.06),
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 12),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(18),
+                            borderRadius: BorderRadius.circular(16),
                             borderSide: BorderSide.none,
                           ),
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 14),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(
+                                color:
+                                    CafeTheme.warmBrown.withValues(alpha: 0.3)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(
+                                color: CafeTheme.primaryGold, width: 1.5),
+                          ),
                         ),
                       ),
                     )
                   : const SizedBox.shrink(),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Helper: زرار فلتر أيقونة + نص ──
+  Widget _filterChip({
+    required IconData icon,
+    required String label,
+    required bool active,
+    required Color activeColor,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: active
+              ? activeColor.withValues(alpha: 0.18)
+              : Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: active
+                ? activeColor
+                : CafeTheme.warmBrown.withValues(alpha: 0.3),
+            width: 1.2,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: active ? activeColor : Colors.white54, size: 16),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                color: active ? activeColor : Colors.white54,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Helper: زرار فلتر مع badge ──
+  Widget _filterChipWithBadge({
+    required IconData icon,
+    required String label,
+    required bool active,
+    required Color activeColor,
+    String? badge,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: active
+              ? activeColor.withValues(alpha: 0.18)
+              : Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: active
+                ? activeColor
+                : CafeTheme.warmBrown.withValues(alpha: 0.3),
+            width: 1.2,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: active ? activeColor : Colors.white54, size: 16),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                color: active ? activeColor : Colors.white54,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            if (badge != null) ...[
+              const SizedBox(width: 5),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: activeColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  badge,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -2434,7 +2573,7 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                               color: isAllSelected
                                   ? Colors.black87
                                   : CafeTheme.primaryGold,
-                              size: 15,
+                              size: 17,
                             ),
                             const SizedBox(width: 6),
                             Text(
@@ -2502,15 +2641,15 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
                             CategoryIcons.resolve(catName),
                             color: isSelected
                                 ? Colors.black87
-                                : CafeTheme.primaryGold.withValues(alpha: 0.6),
-                            size: 15,
+                                : CafeTheme.primaryGold.withValues(alpha: 0.7),
+                            size: 17,
                           ),
                           const SizedBox(width: 6),
                           Text(
                             catName,
                             style: TextStyle(
                               color:
-                                  isSelected ? Colors.black87 : Colors.white60,
+                                  isSelected ? Colors.black87 : Colors.white70,
                               fontSize: 13,
                               fontWeight: isSelected
                                   ? FontWeight.w800
@@ -5182,6 +5321,8 @@ class _StormChatBotState extends State<_StormChatBot>
   String _mood = "";
   String _temp = "";
   String _category = "";
+  String _sweetness = ""; // سؤال 4: حلو ولا مر
+  String _size = ""; // سؤال 5: الحجم
 
   @override
   void initState() {
@@ -5310,13 +5451,72 @@ class _StormChatBotState extends State<_StormChatBot>
     _scrollToBottom();
   }
 
-  // ── عرض النتائج ──
-  void _showResults() {
-    final matched = _filterMenu();
-    if (matched.isEmpty) {
+  // ── السؤال الرابع: حلو ولا مر ──
+  void _askStep4() {
+    setState(() {
+      _messages.add(_ChatMessage(
+        text: "بتحب طعمه إيه؟ 😋",
+        isBot: true,
+        type: _MsgType.choices,
+        choices: [
+          "حلو أوي 🍬",
+          "حلو خفيف 🌸",
+          "مر (بدون سكر) ☕",
+          "فرق معيش 😄"
+        ],
+      ));
+    });
+    _scrollToBottom();
+  }
+
+  // ── السؤال الخامس: الحجم ──
+  void _askStep5() {
+    setState(() {
+      _messages.add(_ChatMessage(
+        text: "بتفضل إيه من ناحية الحجم؟ 📐",
+        isBot: true,
+        type: _MsgType.choices,
+        choices: [
+          "صغير (تيستينج) 🥤",
+          "وسط (ستاندرد) ☕",
+          "كبير (اكسترا) 🫖",
+          "فرق معيش 😄"
+        ],
+      ));
+    });
+    _scrollToBottom();
+  }
+
+  void _showResults() async {
+    // إظهار loading مميز
+    setState(() {
+      _messages.add(_ChatMessage(
+        text: "⚙️ ستورم بيحلل تفضيلاتك ويختار أحسن 5 أصناف ليك...",
+        isBot: true,
+      ));
+    });
+    _scrollToBottom();
+
+    List<Map<String, dynamic>> recommended = [];
+
+    if (_menuCache.isNotEmpty) {
+      try {
+        recommended = await _askGeminiToFilter();
+      } catch (_) {}
+    }
+
+    // fallback لو Gemini فشل
+    if (recommended.isEmpty) {
+      recommended = _localFilter();
+    }
+
+    if (!mounted) return;
+
+    if (recommended.isEmpty) {
       setState(() {
+        _messages.removeLast(); // شيل loading
         _messages.add(_ChatMessage(
-          text: "معلش مش لاقي حاجة بالظبط دلوقتي 😅\nجرب اختيارات تانية!",
+          text: "معلش مش لاقي حاجة مناسبة دلوقتي 😅\nجرب اختيارات تانية!",
           isBot: true,
         ));
         _messages.add(_ChatMessage(
@@ -5327,16 +5527,28 @@ class _StormChatBotState extends State<_StormChatBot>
         ));
       });
     } else {
-      final top = matched.take(5).toList();
+      // بناء رسالة مخصصة حسب التفضيلات
+      final tempMsg = _temp == 'ساخنة'
+          ? '☕ ساخن'
+          : _temp == 'باردة'
+              ? '🧊 بارد'
+              : '';
+      final sweetnessMsg = _sweetness.contains('مر')
+          ? ' | بدون سكر'
+          : _sweetness.contains('حلو أوي')
+              ? ' | حلو'
+              : '';
       setState(() {
+        _messages.removeLast(); // شيل loading
         _messages.add(_ChatMessage(
-          text: "ده اختيارك بناء على مزاجك 🌟\nاختار من الحاجات دي:",
+          text:
+              "✨ ده اختيار ستورم الذكي ليك${tempMsg.isNotEmpty ? ' ($tempMsg$sweetnessMsg)' : ''}\nاضغط على أي صنف عشان تضيفه لطلبك 🛒",
           isBot: true,
           type: _MsgType.products,
-          products: top,
+          products: recommended,
         ));
         _messages.add(_ChatMessage(
-          text: "عجبك حاجة؟ 😍",
+          text: "عجبك الاختيار؟ 😍",
           isBot: true,
           type: _MsgType.choices,
           choices: ["ابدأ من الأول 🔄", "لأ شكراً، هتصفح المنيو 📋"],
@@ -5346,122 +5558,347 @@ class _StormChatBotState extends State<_StormChatBot>
     _scrollToBottom();
   }
 
-  List<Map<String, dynamic>> _filterMenu() {
+  // ── كلمات الاستبعاد الصارمة ──
+  static const List<String> _coldKeywords = [
+    'آيس',
+    'ice',
+    'iced',
+    'كولد',
+    'cold',
+    'فرابتشينو',
+    'frappuccino',
+    'مثلج',
+    'بارد',
+    'ساقع',
+    'frozen',
+    'smoothie',
+    'سموزي',
+  ];
+  static const List<String> _hotKeywords = [
+    'ساخن',
+    'هوت',
+    'hot',
+    'سخن',
+  ];
+
+  // ── Post-filter: يحذف الحاجات الغلط حسب اختيار المستخدم ──
+  List<Map<String, dynamic>> _postFilter(List<Map<String, dynamic>> items) {
+    return items.where((item) {
+      final name = (item['name'] ?? '').toString().toLowerCase();
+      if (_temp == 'ساخنة') {
+        // لو طلب ساخن → استبعد أي حاجة فيها كلمة بارد
+        if (_coldKeywords.any((kw) => name.contains(kw.toLowerCase()))) {
+          return false;
+        }
+      } else if (_temp == 'باردة') {
+        // لو طلب بارد → استبعد أي حاجة فيها كلمة ساخن
+        if (_hotKeywords.any((kw) => name.contains(kw.toLowerCase()))) {
+          return false;
+        }
+      }
+      return true;
+    }).toList();
+  }
+
+  // ── Gemini يختار الأسماء المناسبة فعلاً ──
+  Future<List<Map<String, dynamic>>> _askGeminiToFilter() async {
+    final allNames = _menuCache
+        .map((p) => (p['name'] ?? '').toString())
+        .where((n) => n.isNotEmpty)
+        .toList();
+
+    // ── قسّم المنتجات لساخن وبارد أولاً ──
+    List<String> filteredNames = allNames;
+    if (_temp == 'ساخنة') {
+      filteredNames = allNames.where((n) {
+        final nl = n.toLowerCase();
+        return !_coldKeywords.any((kw) => nl.contains(kw.toLowerCase()));
+      }).toList();
+    } else if (_temp == 'باردة') {
+      filteredNames = allNames.where((n) {
+        final nl = n.toLowerCase();
+        return !_hotKeywords.any((kw) => nl.contains(kw.toLowerCase()));
+      }).toList();
+    }
+
+    final tempLabel = _temp == 'ساخنة'
+        ? 'ساخن فقط (ممنوع أي حاجة باردة أو آيس)'
+        : _temp == 'باردة'
+            ? 'بارد فقط (ممنوع أي حاجة ساخنة)'
+            : 'أي درجة حرارة';
+
+    final catClean = _category
+        .replaceAll(RegExp(r'[☕🍵🍫🍊🍹🧋❄️🔥🥤🍬🌸😋📐🫖]'), '')
+        .trim();
+    final moodClean = _mood.replaceAll(RegExp(r'[⚡😌😴🎉]'), '').trim();
+    final sweetnessAr = _sweetness.contains('حلو أوي')
+        ? 'حلو جداً'
+        : _sweetness.contains('حلو خفيف')
+            ? 'حلو خفيف'
+            : _sweetness.contains('مر')
+                ? 'بدون سكر - مر'
+                : 'أي مستوى حلاوة';
+    final sizeAr = _size.contains('صغير')
+        ? 'صغير'
+        : _size.contains('كبير')
+            ? 'كبير'
+            : _size.contains('وسط')
+                ? 'وسط'
+                : 'أي حجم';
+
+    final prompt =
+        "أنت خبير مشروبات وكافيه محترف. مهمتك: اختار بدقة 5 أصناف مناسبة من القائمة المعطاة فقط.\n\n"
+        "=== قائمة الأصناف المتاحة ===\n"
+        "${filteredNames.join('\n')}\n\n"
+        "=== تفاصيل طلب العميل ===\n"
+        "• درجة الحرارة المطلوبة: $tempLabel\n"
+        "• نوع المشروب المفضل: $catClean\n"
+        "• المزاج الحالي: $moodClean\n"
+        "• مستوى الحلاوة: $sweetnessAr\n"
+        "• الحجم المفضل: $sizeAr\n\n"
+        "=== قواعد الاختيار الصارمة ===\n"
+        "1. اختر من القائمة فقط — لا تخترع أسماء جديدة\n"
+        "2. اكتب كل اسم بالضبط كما هو في القائمة (حرف بحرف)\n"
+        "3. تأكد من مطابقة درجة الحرارة — إذا طلب العميل ساخن فلا تختر آيس أو كولد\n"
+        "4. راعِ مستوى الحلاوة — المر يعني بدون إضافات سكرية\n"
+        "5. اكتب 5 أسماء فقط — كل اسم في سطر منفصل\n"
+        "6. لا ترقيم ولا نقاط ولا شرح — فقط الأسماء\n"
+        "7. رتّب الاختيارات من الأكثر ملاءمة للأقل\n\n"
+        "اكتب الأسماء الآن:";
+
+    final callId = DateTime.now().millisecondsSinceEpoch.toString();
+    final replyKey = 'gr$callId';
+    final errKey = 'ge$callId';
+
+    final body = jsonEncode({
+      'contents': [
+        {
+          'role': 'user',
+          'parts': [
+            {'text': prompt}
+          ]
+        }
+      ],
+      'generationConfig': {
+        'maxOutputTokens': 200,
+        'temperature': 0.1, // أدق من 0 مع تنوع خفيف
+        'topP': 0.8,
+        'topK': 10,
+      },
+      'safetySettings': [
+        {'category': 'HARM_CATEGORY_HARASSMENT', 'threshold': 'BLOCK_NONE'},
+        {'category': 'HARM_CATEGORY_HATE_SPEECH', 'threshold': 'BLOCK_NONE'},
+      ],
+    });
+
+    final url =
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${widget.geminiApiKey}';
+
+    final completer = Completer<String>();
+
+    js.context[replyKey] = null;
+    js.context[errKey] = null;
+    js.context['_body$callId'] = body;
+
+    js.context.callMethod('eval', [
+      """
+      (function() {
+        fetch('$url', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: window['_body$callId']
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          var t = d && d.candidates && d.candidates[0] &&
+                  d.candidates[0].content && d.candidates[0].content.parts &&
+                  d.candidates[0].content.parts[0] && d.candidates[0].content.parts[0].text;
+          window['$replyKey'] = t || '';
+          window['_body$callId'] = null;
+        })
+        .catch(function(e) {
+          window['$errKey'] = e.toString();
+          window['_body$callId'] = null;
+        });
+      })();
+    """
+    ]);
+
+    int waited = 0;
+    while (waited < 8000) {
+      await Future.delayed(const Duration(milliseconds: 200));
+      waited += 200;
+      final reply = js.context[replyKey];
+      final err = js.context[errKey];
+      if (reply != null) {
+        js.context[replyKey] = null;
+        completer.complete(reply.toString());
+        break;
+      }
+      if (err != null) {
+        js.context[errKey] = null;
+        completer.completeError(err.toString());
+        break;
+      }
+    }
+    if (!completer.isCompleted) {
+      completer.completeError('timeout');
+    }
+
+    final responseText = await completer.future;
+
+    // حوّل الأسماء لمنتجات — مطابقة دقيقة أولاً ثم جزئية
+    final lines = responseText
+        .split('\n')
+        .map((l) => l.replaceAll(RegExp(r'^[\d\.\-\*\s]+'), '').trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
+
+    final matched = <Map<String, dynamic>>[];
+
+    // Pass 1: مطابقة دقيقة
+    for (final line in lines) {
+      for (final product in _menuCache) {
+        final pname = (product['name'] ?? '').toString().trim();
+        if (pname == line) {
+          if (!matched.any((m) => m['name'] == product['name'])) {
+            matched.add(product);
+          }
+          break;
+        }
+      }
+    }
+
+    // Pass 2: مطابقة جزئية للأسماء اللي ما اتطابقتش
+    for (final line in lines) {
+      if (matched.length >= 5) break;
+      final lineL = line.toLowerCase();
+      for (final product in _menuCache) {
+        final pname = (product['name'] ?? '').toString().trim();
+        final pnameL = pname.toLowerCase();
+        if (!matched.any((m) => m['name'] == product['name'])) {
+          if (pnameL.contains(lineL) || lineL.contains(pnameL)) {
+            matched.add(product);
+            break;
+          }
+        }
+      }
+    }
+
+    // ── Post-filter الأهم: استبعد الغلط حتى لو Gemini اختاره ──
+    final safe = _postFilter(matched);
+    return safe.take(5).toList();
+  }
+
+  // ── Fallback محلي محسّن مع exclusion صارم ──
+  List<Map<String, dynamic>> _localFilter() {
     if (_menuCache.isEmpty) return [];
 
-    List<String> keywords = [];
+    // كلمات الاستبعاد — مهمة جداً
+    final List<String> excludeIfHot = [
+      "آيس",
+      "ice",
+      "كولد",
+      "cold",
+      "فرابتشينو",
+      "frappuccino",
+      "iced"
+    ];
+    final List<String> excludeIfCold = ["هوت", "hot", "ساخن"];
 
-    // بناءً على النوع المختار
+    final List<String> includeKeywords = [];
+
     if (_category.contains("قهوة") || _category.contains("آيس كوفي")) {
-      keywords.addAll([
+      includeKeywords.addAll([
         "قهوة",
         "اسبريسو",
         "لاتيه",
         "كابتشينو",
         "موكا",
-        "كولد برو",
+        "امريكانو",
         "americano"
       ]);
+      if (_temp == "باردة")
+        includeKeywords.addAll(["كولد", "آيس", "ice", "iced"]);
     } else if (_category.contains("شاي")) {
-      keywords.addAll(["شاي", "tea", "كركديه", "نعناع"]);
+      includeKeywords.addAll(["شاي", "tea", "كركديه", "نعناع", "اخضر", "أخضر"]);
     } else if (_category.contains("شوكولاتة")) {
-      keywords.addAll(["شوكولاتة", "هوت تشوكليت", "موكا"]);
+      includeKeywords
+          .addAll(["شوكولاتة", "chocolate", "موكا", "كاكاو", "cocoa"]);
     } else if (_category.contains("عصير")) {
-      keywords.addAll(["عصير", "juice", "ليمون", "برتقال", "منجو", "فراولة"]);
+      includeKeywords.addAll([
+        "عصير",
+        "juice",
+        "ليمون",
+        "برتقال",
+        "مانجو",
+        "منجو",
+        "فراولة",
+        "كيوي"
+      ]);
     } else if (_category.contains("موهيتو") || _category.contains("كوكتيل")) {
-      keywords.addAll(["موهيتو", "كوكتيل", "smoothie", "سموزي"]);
+      includeKeywords.addAll(
+          ["موهيتو", "mojito", "كوكتيل", "cocktail", "سموزي", "smoothie"]);
     } else if (_category.contains("مشروب منعش") ||
         _category.contains("مشروب بارد")) {
-      keywords.addAll(["سوبيا", "تمر هندي", "آيس", "مثلجات", "منعش", "بارد"]);
+      includeKeywords
+          .addAll(["سوبيا", "تمر هندي", "آيس", "منعش", "بارد", "ليمون"]);
     } else if (_category.contains("مشروب ساخن")) {
-      keywords.addAll(["شاي", "قهوة", "هوت", "ساخن", "كاكاو"]);
+      includeKeywords
+          .addAll(["شاي", "قهوة", "هوت", "ساخن", "كاكاو", "شوكولاتة"]);
     }
 
-    // فلتر إضافي: ساخن أو بارد
-    List<String> tempKeywords = [];
-    if (_temp == "ساخنة") {
-      tempKeywords = [
-        "ساخن",
-        "هوت",
-        "hot",
-        "شاي",
-        "قهوة",
-        "اسبريسو",
-        "لاتيه",
-        "كابتشينو",
-        "موكا"
-      ];
-    } else if (_temp == "باردة") {
-      tempKeywords = [
-        "بارد",
-        "آيس",
-        "ice",
-        "كولد",
-        "cold",
-        "فرابتشينو",
-        "مثلجات",
-        "عصير",
-        "موهيتو",
-        "سموزي"
-      ];
-    }
+    final List<Map<String, dynamic>> result = [];
 
-    List<Map<String, dynamic>> result = [];
-
-    for (var item in _menuCache) {
+    for (final item in _menuCache) {
       final name = (item['name'] ?? '').toString().toLowerCase();
+
+      // استبعاد صارم حسب درجة الحرارة
+      if (_temp == "ساخنة") {
+        if (excludeIfHot.any((kw) => name.contains(kw.toLowerCase()))) continue;
+      } else if (_temp == "باردة") {
+        if (excludeIfCold.any((kw) => name.contains(kw.toLowerCase())))
+          continue;
+      }
+
+      // استبعاد حسب الحلاوة
+      if (_sweetness.contains("مر")) {
+        // لو عايز مر، نستبعد الحاجات الحلوة أوي
+        if (name.contains("كراميل") ||
+            name.contains("شوكولاتة") ||
+            name.contains("هيزل") ||
+            name.contains("فانيلا")) continue;
+      }
+
+      // تحقق إن المنتج له كلمة مطابقة
       int score = 0;
-
-      for (var kw in keywords) {
-        if (name.contains(kw.toLowerCase())) score += 3;
+      for (final kw in includeKeywords) {
+        if (name.contains(kw.toLowerCase())) {
+          score += 3;
+          break;
+        }
       }
-      for (var kw in tempKeywords) {
-        if (name.contains(kw.toLowerCase())) score += 1;
-      }
+      if (score == 0) continue;
 
-      // المزاج
-      if (_mood.contains("نشيط")) {
-        if (name.contains("اسبريسو") ||
-            name.contains("كولد برو") ||
-            name.contains("منعش")) score += 2;
-      } else if (_mood.contains("هادي")) {
-        if (name.contains("شاي") ||
-            name.contains("لاتيه") ||
-            name.contains("كاموميل")) score += 2;
-      } else if (_mood.contains("تعبان")) {
-        if (name.contains("قهوة") ||
-            name.contains("عصير") ||
-            name.contains("ليمون")) score += 2;
-      } else if (_mood.contains("فرحان")) {
-        if (name.contains("موهيتو") ||
-            name.contains("فرابتشينو") ||
-            name.contains("كوكتيل")) score += 2;
-      }
-
-      if (score > 0) result.add({...item, '_score': score});
-    }
-
-    result.sort((a, b) {
-      final scoreB = (b['_score'] as int? ?? 0);
-      final scoreA = (a['_score'] as int? ?? 0);
-      if (scoreB != scoreA) return scoreB.compareTo(scoreA);
-      final orderB = (b['order_count'] as num?)?.toInt() ?? 0;
-      final orderA = (a['order_count'] as num?)?.toInt() ?? 0;
-      return orderB.compareTo(orderA);
-    });
-
-    // لو مفيش كلمات محددة، رجّع الأكثر طلباً
-    if (result.isEmpty) {
-      final sorted = List<Map<String, dynamic>>.from(_menuCache);
-      sorted.sort((a, b) {
-        final ob = (b['order_count'] as num?)?.toInt() ?? 0;
-        final oa = (a['order_count'] as num?)?.toInt() ?? 0;
-        return ob.compareTo(oa);
+      // ترتيب حسب الأكثر طلباً
+      final orders = (item['order_count'] as num?)?.toInt() ?? 0;
+      result.add({
+        ...item,
+        '_score': score +
+            (orders > 50
+                ? 3
+                : orders > 20
+                    ? 2
+                    : orders > 5
+                        ? 1
+                        : 0)
       });
-      return sorted.take(5).toList();
     }
 
-    return result;
+    result.sort((a, b) =>
+        ((b['_score'] as int?) ?? 0).compareTo((a['_score'] as int?) ?? 0));
+    // ── post-filter للتأكد ──
+    return _postFilter(result).take(5).toList();
   }
 
   void _onChoiceTapped(String choice) {
@@ -5488,6 +5925,8 @@ class _StormChatBotState extends State<_StormChatBot>
       _mood = "";
       _temp = "";
       _category = "";
+      _sweetness = "";
+      _size = "";
       Future.delayed(const Duration(milliseconds: 400), () {
         if (mounted) _askStep1();
       });
@@ -5513,6 +5952,14 @@ class _StormChatBotState extends State<_StormChatBot>
       } else if (_step == 2) {
         _category = choice;
         _step = 3;
+        _askStep4();
+      } else if (_step == 3) {
+        _sweetness = choice;
+        _step = 4;
+        _askStep5();
+      } else if (_step == 4) {
+        _size = choice;
+        _step = 5;
         _showResults();
       }
     });
@@ -5547,6 +5994,13 @@ class _StormChatBotState extends State<_StormChatBot>
 
   @override
   Widget build(BuildContext context) {
+    final screenW = MediaQuery.of(context).size.width;
+    final screenH = MediaQuery.of(context).size.height;
+    // على الشاشات الصغيرة يبقى أكبر نسبياً
+    final chatLeft = screenW < 380 ? 8.0 : 12.0;
+    final chatRight = screenW < 380 ? 8.0 : 12.0;
+    final chatMaxH = math.min(screenH * 0.55, 480.0);
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Stack(
@@ -5554,11 +6008,14 @@ class _StormChatBotState extends State<_StormChatBot>
           if (_isOpen)
             Positioned(
               bottom: 90,
-              left: 12,
-              right: 12,
+              left: chatLeft,
+              right: chatRight,
               child: SlideTransition(
                 position: _slideAnim,
-                child: _chatWindow(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: chatMaxH),
+                  child: _chatWindow(),
+                ),
               ),
             ),
           Positioned(
@@ -5572,34 +6029,65 @@ class _StormChatBotState extends State<_StormChatBot>
   }
 
   Widget _floatingButton() {
+    // ✦ عدد رسائل البوت غير المقروءة
+    final unread = _isOpen ? 0 : _messages.where((m) => m.isBot).length;
     return AnimatedBuilder(
       animation: _bubbleAnim,
       builder: (context, _) => GestureDetector(
         onTap: _toggleChat,
-        child: Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: const LinearGradient(
-              colors: [CafeTheme.primaryGold, CafeTheme.warmBrown],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: CafeTheme.primaryGold
-                    .withValues(alpha: 0.2 + 0.3 * _bubbleAnim.value),
-                blurRadius: 12 + 8 * _bubbleAnim.value,
-                spreadRadius: 1,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const LinearGradient(
+                  colors: [CafeTheme.primaryGold, CafeTheme.warmBrown],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: CafeTheme.primaryGold
+                        .withValues(alpha: 0.2 + 0.35 * _bubbleAnim.value),
+                    blurRadius: 14 + 10 * _bubbleAnim.value,
+                    spreadRadius: 1,
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: Icon(
-            _isOpen ? Icons.close_rounded : Icons.smart_toy_rounded,
-            color: Colors.black,
-            size: 26,
-          ),
+              child: Icon(
+                _isOpen ? Icons.close_rounded : Icons.smart_toy_rounded,
+                color: Colors.black,
+                size: 28,
+              ),
+            ),
+            // ✦ Badge عدد الرسائل لما الشات مغلق
+            if (!_isOpen && unread > 0)
+              Positioned(
+                top: -4,
+                right: -4,
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: const BoxDecoration(
+                    color: Colors.redAccent,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      unread > 9 ? "9+" : "$unread",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -5608,30 +6096,33 @@ class _StormChatBotState extends State<_StormChatBot>
   Widget _chatWindow() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: Container(
-          constraints: const BoxConstraints(maxHeight: 460),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1A1008).withValues(alpha: 0.96),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-                color: CafeTheme.primaryGold.withValues(alpha: 0.28)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.5),
-                blurRadius: 24,
-                spreadRadius: 3,
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _header(),
-              Flexible(child: _messageList()),
-            ],
-          ),
+      child: Container(
+        decoration: BoxDecoration(
+          // ✦ [PERF] إزالة BackdropFilter — كان يسبب GPU pass إضافي في كل frame
+          // بدّلناه بخلفية غامقة شبه-معتمة بنفس الجمالية
+          color: const Color(0xF51A1008),
+          borderRadius: BorderRadius.circular(24),
+          border:
+              Border.all(color: CafeTheme.primaryGold.withValues(alpha: 0.28)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.65),
+              blurRadius: 28,
+              spreadRadius: 4,
+            ),
+            BoxShadow(
+              color: CafeTheme.primaryGold.withValues(alpha: 0.06),
+              blurRadius: 20,
+              spreadRadius: 0,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _header(),
+            Flexible(child: _messageList()),
+          ],
         ),
       ),
     );
