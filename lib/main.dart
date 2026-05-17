@@ -3,11 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'dart:ui';
 import 'dart:convert';
-import 'dart:async';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:js' as js;
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
 
 import 'firebase_options.dart';
 import 'services/api_service.dart';
@@ -5127,14 +5124,25 @@ class _WaiterTerminalState extends State<WaiterTerminal> {
 }
 
 // ============================================================
-// 🤖 Storm AI Chatbot — Gemini 1.5 Flash
-// خفيف | dart:convert للـ JSON | JS callback بدون polling ثابت
+// 🤖 Storm AI — نظام أسئلة وتوصيات ذكي محلي بدون API
 // ============================================================
+
+enum _MsgType { text, choices, products }
 
 class _ChatMessage {
   final String text;
   final bool isBot;
-  _ChatMessage({required this.text, required this.isBot});
+  final _MsgType type;
+  final List<String> choices;
+  final List<Map<String, dynamic>> products;
+
+  _ChatMessage({
+    required this.text,
+    required this.isBot,
+    this.type = _MsgType.text,
+    this.choices = const [],
+    this.products = const [],
+  });
 }
 
 class _StormChatBot extends StatefulWidget {
@@ -5159,19 +5167,21 @@ class _StormChatBot extends StatefulWidget {
 class _StormChatBotState extends State<_StormChatBot>
     with TickerProviderStateMixin {
   bool _isOpen = false;
-  bool _isLoading = false;
-  bool _canSend = true;
   final List<_ChatMessage> _messages = [];
-  final TextEditingController _inputCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
 
   late AnimationController _bubbleAnim;
   late AnimationController _slideCtrl;
   late Animation<Offset> _slideAnim;
 
-  // المنيو يُحمَّل مرة واحدة فقط عند أول فتح
   List<Map<String, dynamic>> _menuCache = [];
   bool _menuLoaded = false;
+
+  // حالة الأسئلة
+  int _step = 0;
+  String _mood = "";
+  String _temp = "";
+  String _category = "";
 
   @override
   void initState() {
@@ -5180,7 +5190,6 @@ class _StormChatBotState extends State<_StormChatBot>
       vsync: this,
       duration: const Duration(seconds: 2),
     );
-
     _slideCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 280),
@@ -5190,14 +5199,13 @@ class _StormChatBotState extends State<_StormChatBot>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _slideCtrl, curve: Curves.easeOutCubic));
 
-    _messages.add(_ChatMessage(text: _welcomeMessage, isBot: true));
+    _addWelcome();
   }
 
   @override
   void dispose() {
     _bubbleAnim.dispose();
     _slideCtrl.dispose();
-    _inputCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
   }
@@ -5208,156 +5216,314 @@ class _StormChatBotState extends State<_StormChatBot>
     try {
       final snap = await FirebaseFirestore.instance
           .collection('products')
-          .limit(60)
+          .limit(80)
           .get();
-      _menuCache = snap.docs.map((d) => d.data()).toList();
+      if (mounted) {
+        setState(() {
+          _menuCache = snap.docs.map((d) => d.data()).toList();
+        });
+      }
     } catch (_) {}
   }
 
-  String get _welcomeMessage {
-    final name =
-        widget.customerName != null ? " يا ${widget.customerName}" : "";
+  void _addWelcome() {
     final hour = DateTime.now().hour;
     final greeting = hour < 12
-        ? "صباح الخير$name ☀️"
+        ? "صباح النور ☀️"
         : hour < 17
-            ? "أهلاً$name 😊"
-            : "مساء النور$name 🌙";
-    String hint = "";
+            ? "أهلاً 😊"
+            : "مساء النور 🌙";
+    final name =
+        widget.customerName != null ? " يا ${widget.customerName}" : "";
+    _messages.add(_ChatMessage(
+      text:
+          "$greeting$name! أنا ستورم مساعدك الذكي ✨\nهساعدك تختار أحسن حاجة تناسبك 🎯",
+      isBot: true,
+    ));
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) _askStep1();
+    });
+  }
+
+  // ── السؤال الأول: المزاج ──
+  void _askStep1() {
+    setState(() {
+      _messages.add(_ChatMessage(
+        text: "إيه مزاجك النهارده؟ 😄",
+        isBot: true,
+        type: _MsgType.choices,
+        choices: [
+          "نشيط وعايز أتحرك ⚡",
+          "هادي ومريح 😌",
+          "تعبان شوية 😴",
+          "فرحان واحتفل 🎉"
+        ],
+      ));
+    });
+    _scrollToBottom();
+  }
+
+  // ── السؤال الثاني: حار ولا بارد ──
+  void _askStep2() {
+    String weatherHint = "";
     if (widget.weatherTemp != null) {
       final t = widget.weatherTemp!;
-      if (t > 28) {
-        hint =
-            "\nالجو حار ${widget.weatherEmoji} — قولي مزاجك وأنا أقترح عليك حاجة تبردك! 🧊";
-      } else if (t < 18) {
-        hint = "\nالجو برد ${widget.weatherEmoji} — أقترح عليك حاجة تدفيك؟ ☕";
-      } else {
-        hint = "\nالجو تمام ${widget.weatherEmoji}";
-      }
+      if (t > 28)
+        weatherHint = " (الجو حر دلوقتي ${t.toInt()}° ${widget.weatherEmoji})";
+      else if (t < 18)
+        weatherHint = " (الجو برد دلوقتي ${t.toInt()}° ${widget.weatherEmoji})";
     }
-    return "$greeting\nأنا ستورم — مساعدك الذكي في Storm Café ✨$hint\n\nقولي إيه مزاجك وأنا أختارلك الأنسب! 🎯";
-  }
-
-  String _buildSystemPrompt() {
-    final hour = DateTime.now().hour;
-    final timeSlot = hour < 10
-        ? "الصبح"
-        : hour < 14
-            ? "الضهر"
-            : hour < 19
-                ? "بعد الضهر"
-                : hour < 23
-                    ? "المساء"
-                    : "الليل";
-    final weatherStr = widget.weatherTemp != null
-        ? "${widget.weatherTemp!.toStringAsFixed(0)}°م — ${widget.weatherCondition} ${widget.weatherEmoji}"
-        : "غير محدد";
-    final menuStr = _menuCache.isEmpty
-        ? "المنيو لم يُحمَّل بعد"
-        : _menuCache
-            .take(60)
-            .map((item) =>
-                "• ${item['name'] ?? ''} — ${item['price'] ?? '—'} ج.م")
-            .join('\n');
-    return "أنت ستورم، مساعد Storm Café. بتتكلم عربي مصري مختصر.\n"
-        "الوقت: $timeSlot | الطقس: $weatherStr | العميل: ${widget.customerName ?? 'ضيف'}\n"
-        "المنيو:\n$menuStr\n\n"
-        "قواعد: اقترح فقط من المنيو. لو حار اقترح باردة. لو بارد اقترح ساخنة. "
-        "ردود قصيرة جملتين بالكتير. مش في المنيو قول مش عندنا للأسف. "
-        "لو اختار قوله اختار ده من المنيو وضيفه للسلة.";
-  }
-
-  Future<String> _callGemini(String userMessage) async {
-    final recent = _messages.length > 7
-        ? _messages.sublist(_messages.length - 6)
-        : _messages.skip(1).toList();
-
-    final contents = <Map<String, dynamic>>[];
-    for (final m in recent) {
-      contents.add({
-        'role': m.isBot ? 'model' : 'user',
-        'parts': [
-          {'text': m.text}
-        ],
-      });
-    }
-    contents.add({
-      'role': 'user',
-      'parts': [
-        {'text': userMessage}
-      ]
-    });
-
-    final body = jsonEncode({
-      'system_instruction': {
-        'parts': [
-          {'text': _buildSystemPrompt()}
-        ]
-      },
-      'contents': contents,
-      'generationConfig': {'maxOutputTokens': 150, 'temperature': 0.7},
-    });
-
-    final url = 'https://generativelanguage.googleapis.com/v1beta/'
-        'models/gemini-1.5-flash:generateContent?key=${widget.geminiApiKey}';
-
-    try {
-      final response = await html.HttpRequest.request(
-        url,
-        method: 'POST',
-        requestHeaders: {'Content-Type': 'application/json'},
-        sendData: body,
-      ).timeout(const Duration(seconds: 15));
-
-      final data = jsonDecode(response.responseText ?? '{}');
-      final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'];
-      return text?.toString() ?? "معلش مفيش رد 🙏";
-    } on html.ProgressEvent catch (_) {
-      return "في مشكلة في الاتصال، حاول تاني 🙏";
-    } catch (e) {
-      if (e.toString().contains('TimeoutException')) {
-        return "الاتصال اتأخر، حاول تاني ✨";
-      }
-      return "في مشكلة، حاول تاني 🙏";
-    }
-  }
-
-  void _sendMessage() async {
-    final text = _inputCtrl.text.trim();
-    if (text.isEmpty || _isLoading || !_canSend) return;
-    _canSend = false;
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) _canSend = true;
-    });
     setState(() {
-      _messages.add(_ChatMessage(text: text, isBot: false));
-      _isLoading = true;
+      _messages.add(_ChatMessage(
+        text: "بتفضل إيه$weatherHint؟ 🥤",
+        isBot: true,
+        type: _MsgType.choices,
+        choices: ["حاجة ساخنة ☕", "حاجة باردة 🧊", "فرق معيش 😄"],
+      ));
     });
-    _inputCtrl.clear();
     _scrollToBottom();
-    try {
-      final reply = await _callGemini(text);
-      if (!mounted) return;
+  }
+
+  // ── السؤال الثالث: النوع ──
+  void _askStep3() {
+    List<String> options;
+    if (_temp == "ساخنة") {
+      options = ["قهوة ☕", "شاي 🍵", "شوكولاتة 🍫", "مشروب ساخن تاني 🔥"];
+    } else if (_temp == "باردة") {
+      options = [
+        "عصير طازج 🍊",
+        "موهيتو أو كوكتيل 🍹",
+        "مشروب منعش 🧋",
+        "آيس كوفي ☕❄️"
+      ];
+    } else {
+      options = ["قهوة ☕", "عصير 🍊", "مشروب ساخن 🔥", "مشروب بارد 🧊"];
+    }
+    setState(() {
+      _messages.add(_ChatMessage(
+        text: "إيه اللي بتحب أكتر؟ 🎯",
+        isBot: true,
+        type: _MsgType.choices,
+        choices: options,
+      ));
+    });
+    _scrollToBottom();
+  }
+
+  // ── عرض النتائج ──
+  void _showResults() {
+    final matched = _filterMenu();
+    if (matched.isEmpty) {
       setState(() {
-        _messages.add(_ChatMessage(text: reply, isBot: true));
-        _isLoading = false;
+        _messages.add(_ChatMessage(
+          text: "معلش مش لاقي حاجة بالظبط دلوقتي 😅\nجرب اختيارات تانية!",
+          isBot: true,
+        ));
+        _messages.add(_ChatMessage(
+          text: "تحب تبدأ من الأول؟",
+          isBot: true,
+          type: _MsgType.choices,
+          choices: ["أيوه ابدأ من الأول 🔄", "لأ شكراً 😊"],
+        ));
       });
-    } catch (_) {
-      if (!mounted) return;
+    } else {
+      final top = matched.take(5).toList();
       setState(() {
-        _messages.add(_ChatMessage(text: "معلش حصل خطأ 😔", isBot: true));
-        _isLoading = false;
+        _messages.add(_ChatMessage(
+          text: "ده اختيارك بناء على مزاجك 🌟\nاختار من الحاجات دي:",
+          isBot: true,
+          type: _MsgType.products,
+          products: top,
+        ));
+        _messages.add(_ChatMessage(
+          text: "عجبك حاجة؟ 😍",
+          isBot: true,
+          type: _MsgType.choices,
+          choices: ["ابدأ من الأول 🔄", "لأ شكراً، هتصفح المنيو 📋"],
+        ));
       });
     }
     _scrollToBottom();
+  }
+
+  List<Map<String, dynamic>> _filterMenu() {
+    if (_menuCache.isEmpty) return [];
+
+    List<String> keywords = [];
+
+    // بناءً على النوع المختار
+    if (_category.contains("قهوة") || _category.contains("آيس كوفي")) {
+      keywords.addAll([
+        "قهوة",
+        "اسبريسو",
+        "لاتيه",
+        "كابتشينو",
+        "موكا",
+        "كولد برو",
+        "americano"
+      ]);
+    } else if (_category.contains("شاي")) {
+      keywords.addAll(["شاي", "tea", "كركديه", "نعناع"]);
+    } else if (_category.contains("شوكولاتة")) {
+      keywords.addAll(["شوكولاتة", "هوت تشوكليت", "موكا"]);
+    } else if (_category.contains("عصير")) {
+      keywords.addAll(["عصير", "juice", "ليمون", "برتقال", "منجو", "فراولة"]);
+    } else if (_category.contains("موهيتو") || _category.contains("كوكتيل")) {
+      keywords.addAll(["موهيتو", "كوكتيل", "smoothie", "سموزي"]);
+    } else if (_category.contains("مشروب منعش") ||
+        _category.contains("مشروب بارد")) {
+      keywords.addAll(["سوبيا", "تمر هندي", "آيس", "مثلجات", "منعش", "بارد"]);
+    } else if (_category.contains("مشروب ساخن")) {
+      keywords.addAll(["شاي", "قهوة", "هوت", "ساخن", "كاكاو"]);
+    }
+
+    // فلتر إضافي: ساخن أو بارد
+    List<String> tempKeywords = [];
+    if (_temp == "ساخنة") {
+      tempKeywords = [
+        "ساخن",
+        "هوت",
+        "hot",
+        "شاي",
+        "قهوة",
+        "اسبريسو",
+        "لاتيه",
+        "كابتشينو",
+        "موكا"
+      ];
+    } else if (_temp == "باردة") {
+      tempKeywords = [
+        "بارد",
+        "آيس",
+        "ice",
+        "كولد",
+        "cold",
+        "فرابتشينو",
+        "مثلجات",
+        "عصير",
+        "موهيتو",
+        "سموزي"
+      ];
+    }
+
+    List<Map<String, dynamic>> result = [];
+
+    for (var item in _menuCache) {
+      final name = (item['name'] ?? '').toString().toLowerCase();
+      int score = 0;
+
+      for (var kw in keywords) {
+        if (name.contains(kw.toLowerCase())) score += 3;
+      }
+      for (var kw in tempKeywords) {
+        if (name.contains(kw.toLowerCase())) score += 1;
+      }
+
+      // المزاج
+      if (_mood.contains("نشيط")) {
+        if (name.contains("اسبريسو") ||
+            name.contains("كولد برو") ||
+            name.contains("منعش")) score += 2;
+      } else if (_mood.contains("هادي")) {
+        if (name.contains("شاي") ||
+            name.contains("لاتيه") ||
+            name.contains("كاموميل")) score += 2;
+      } else if (_mood.contains("تعبان")) {
+        if (name.contains("قهوة") ||
+            name.contains("عصير") ||
+            name.contains("ليمون")) score += 2;
+      } else if (_mood.contains("فرحان")) {
+        if (name.contains("موهيتو") ||
+            name.contains("فرابتشينو") ||
+            name.contains("كوكتيل")) score += 2;
+      }
+
+      if (score > 0) result.add({...item, '_score': score});
+    }
+
+    result.sort((a, b) {
+      final scoreB = (b['_score'] as int? ?? 0);
+      final scoreA = (a['_score'] as int? ?? 0);
+      if (scoreB != scoreA) return scoreB.compareTo(scoreA);
+      final orderB = (b['order_count'] as num?)?.toInt() ?? 0;
+      final orderA = (a['order_count'] as num?)?.toInt() ?? 0;
+      return orderB.compareTo(orderA);
+    });
+
+    // لو مفيش كلمات محددة، رجّع الأكثر طلباً
+    if (result.isEmpty) {
+      final sorted = List<Map<String, dynamic>>.from(_menuCache);
+      sorted.sort((a, b) {
+        final ob = (b['order_count'] as num?)?.toInt() ?? 0;
+        final oa = (a['order_count'] as num?)?.toInt() ?? 0;
+        return ob.compareTo(oa);
+      });
+      return sorted.take(5).toList();
+    }
+
+    return result;
+  }
+
+  void _onChoiceTapped(String choice) {
+    setState(() {
+      // أضف رد المستخدم
+      _messages.add(_ChatMessage(text: choice, isBot: false));
+      // شيل الأزرار من آخر رسالة بوت
+      for (int i = _messages.length - 2; i >= 0; i--) {
+        if (_messages[i].isBot && _messages[i].type == _MsgType.choices) {
+          _messages[i] = _ChatMessage(
+            text: _messages[i].text,
+            isBot: true,
+            type: _MsgType.text,
+          );
+          break;
+        }
+      }
+    });
+    _scrollToBottom();
+
+    // إعادة تشغيل
+    if (choice.contains("ابدأ من الأول") || choice.contains("أيوه")) {
+      _step = 0;
+      _mood = "";
+      _temp = "";
+      _category = "";
+      Future.delayed(const Duration(milliseconds: 400), () {
+        if (mounted) _askStep1();
+      });
+      return;
+    }
+    if (choice.contains("شكراً")) return;
+
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      if (_step == 0) {
+        _mood = choice;
+        _step = 1;
+        _askStep2();
+      } else if (_step == 1) {
+        if (choice.contains("ساخنة"))
+          _temp = "ساخنة";
+        else if (choice.contains("باردة"))
+          _temp = "باردة";
+        else
+          _temp = "فرق معيش";
+        _step = 2;
+        _askStep3();
+      } else if (_step == 2) {
+        _category = choice;
+        _step = 3;
+        _showResults();
+      }
+    });
   }
 
   void _scrollToBottom() {
-    Future.delayed(const Duration(milliseconds: 100), () {
+    Future.delayed(const Duration(milliseconds: 150), () {
       if (_scrollCtrl.hasClients) {
         _scrollCtrl.animateTo(
           _scrollCtrl.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 280),
+          duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
       }
@@ -5445,7 +5611,7 @@ class _StormChatBotState extends State<_StormChatBot>
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
         child: Container(
-          constraints: const BoxConstraints(maxHeight: 440),
+          constraints: const BoxConstraints(maxHeight: 460),
           decoration: BoxDecoration(
             color: const Color(0xFF1A1008).withValues(alpha: 0.96),
             borderRadius: BorderRadius.circular(24),
@@ -5464,8 +5630,6 @@ class _StormChatBotState extends State<_StormChatBot>
             children: [
               _header(),
               Flexible(child: _messageList()),
-              if (_isLoading) _typingIndicator(),
-              _inputBar(),
             ],
           ),
         ),
@@ -5533,131 +5697,191 @@ class _StormChatBotState extends State<_StormChatBot>
       controller: _scrollCtrl,
       padding: const EdgeInsets.all(10),
       itemCount: _messages.length,
-      itemBuilder: (context, i) => _bubble(_messages[i]),
+      itemBuilder: (context, i) => _buildMessage(_messages[i]),
     );
   }
 
-  Widget _bubble(_ChatMessage msg) {
-    return Align(
-      alignment: msg.isBot ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 7),
-        constraints: const BoxConstraints(maxWidth: 270),
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
-        decoration: BoxDecoration(
-          gradient: msg.isBot
-              ? LinearGradient(
-                  colors: [
-                    CafeTheme.primaryGold.withValues(alpha: 0.13),
-                    CafeTheme.warmBrown.withValues(alpha: 0.08),
-                  ],
-                  begin: Alignment.topRight,
-                  end: Alignment.bottomLeft,
-                )
-              : null,
-          color: msg.isBot ? null : const Color(0xFF2A1A0A),
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(16),
-            topRight: const Radius.circular(16),
-            bottomLeft: msg.isBot
-                ? const Radius.circular(4)
-                : const Radius.circular(16),
-            bottomRight: msg.isBot
-                ? const Radius.circular(16)
-                : const Radius.circular(4),
-          ),
-          border: Border.all(
-            color: msg.isBot
-                ? CafeTheme.primaryGold.withValues(alpha: 0.2)
-                : Colors.white.withValues(alpha: 0.07),
+  Widget _buildMessage(_ChatMessage msg) {
+    return Column(
+      crossAxisAlignment:
+          msg.isBot ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        // فقاعة النص
+        Align(
+          alignment: msg.isBot ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 6),
+            constraints: const BoxConstraints(maxWidth: 260),
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+            decoration: BoxDecoration(
+              gradient: msg.isBot
+                  ? LinearGradient(
+                      colors: [
+                        CafeTheme.primaryGold.withValues(alpha: 0.13),
+                        CafeTheme.warmBrown.withValues(alpha: 0.08),
+                      ],
+                      begin: Alignment.topRight,
+                      end: Alignment.bottomLeft,
+                    )
+                  : null,
+              color: msg.isBot ? null : const Color(0xFF2A1A0A),
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(16),
+                topRight: const Radius.circular(16),
+                bottomLeft: msg.isBot
+                    ? const Radius.circular(4)
+                    : const Radius.circular(16),
+                bottomRight: msg.isBot
+                    ? const Radius.circular(16)
+                    : const Radius.circular(4),
+              ),
+              border: Border.all(
+                color: msg.isBot
+                    ? CafeTheme.primaryGold.withValues(alpha: 0.2)
+                    : Colors.white.withValues(alpha: 0.07),
+              ),
+            ),
+            child: Text(
+              msg.text,
+              style: TextStyle(
+                color: msg.isBot ? Colors.white : Colors.white70,
+                fontSize: 13,
+                height: 1.5,
+              ),
+            ),
           ),
         ),
+        // أزرار الاختيارات
+        if (msg.type == _MsgType.choices)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              alignment: WrapAlignment.end,
+              children: msg.choices.map((c) => _choiceBtn(c)).toList(),
+            ),
+          ),
+        // كروت المنتجات
+        if (msg.type == _MsgType.products)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Column(
+              children: msg.products.map((p) => _productCard(p)).toList(),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _choiceBtn(String label) {
+    return GestureDetector(
+      onTap: () => _onChoiceTapped(label),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [CafeTheme.primaryGold, CafeTheme.warmBrown],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: CafeTheme.primaryGold.withValues(alpha: 0.25),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
         child: Text(
-          msg.text,
-          style: TextStyle(
-            color: msg.isBot ? Colors.white : Colors.white70,
-            fontSize: 13,
-            height: 1.5,
+          label,
+          style: const TextStyle(
+            color: Colors.black,
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
           ),
         ),
       ),
     );
   }
 
-  Widget _typingIndicator() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 2, 14, 2),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        const Icon(Icons.smart_toy_rounded,
-            color: CafeTheme.primaryGold, size: 14),
-        const SizedBox(width: 5),
-        Text(
-          "ستورم بيفكر...",
-          style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.4),
-              fontSize: 11,
-              fontStyle: FontStyle.italic),
-        ),
-        const SizedBox(width: 5),
-        const SizedBox(
-          width: 12,
-          height: 12,
-          child: CircularProgressIndicator(
-              strokeWidth: 1.5, color: CafeTheme.primaryGold),
-        ),
-      ]),
-    );
-  }
+  Widget _productCard(Map<String, dynamic> product) {
+    final name = product['name']?.toString() ?? "منتج";
+    final price = product['price']?.toString() ?? "—";
+    final imageUrl = product['image_url']?.toString() ?? "";
+    final orders = (product['order_count'] as num?)?.toInt() ?? 0;
 
-  Widget _inputBar() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 7, 10, 10),
+      margin: const EdgeInsets.only(bottom: 7),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: CafeTheme.primaryGold.withValues(alpha: 0.13)),
+        color: const Color(0xFF2A1A0A),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: CafeTheme.primaryGold.withValues(alpha: 0.25),
         ),
       ),
       child: Row(
         children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                    color: CafeTheme.primaryGold.withValues(alpha: 0.18)),
-              ),
-              child: TextField(
-                controller: _inputCtrl,
-                style: const TextStyle(color: Colors.white, fontSize: 13),
-                decoration: const InputDecoration(
-                  hintText: "اكتب طلبك أو مزاجك...",
-                  hintStyle: TextStyle(color: Colors.white38, fontSize: 12),
-                  border: InputBorder.none,
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 13, vertical: 9),
-                ),
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _sendMessage(),
-              ),
-            ),
+          // صورة المنتج
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: imageUrl.isNotEmpty
+                ? Image.network(
+                    imageUrl,
+                    width: 52,
+                    height: 52,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: 52,
+                      height: 52,
+                      color: CafeTheme.surfaceLight,
+                      child: const Icon(Icons.local_cafe_rounded,
+                          color: CafeTheme.primaryGold, size: 28),
+                    ),
+                  )
+                : Container(
+                    width: 52,
+                    height: 52,
+                    color: CafeTheme.surfaceLight,
+                    child: const Icon(Icons.local_cafe_rounded,
+                        color: CafeTheme.primaryGold, size: 28),
+                  ),
           ),
-          const SizedBox(width: 7),
-          GestureDetector(
-            onTap: _sendMessage,
-            child: Container(
-              width: 38,
-              height: 38,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [CafeTheme.primaryGold, CafeTheme.warmBrown],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              child:
-                  const Icon(Icons.send_rounded, color: Colors.black, size: 17),
+                const SizedBox(height: 3),
+                Text(
+                  "$price ج.م",
+                  style: const TextStyle(
+                    color: CafeTheme.primaryGold,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (orders > 0)
+                  Text(
+                    "🔥 طُلب $orders مرة",
+                    style: const TextStyle(
+                      color: Colors.white38,
+                      fontSize: 10,
+                    ),
+                  ),
+              ],
             ),
           ),
         ],
